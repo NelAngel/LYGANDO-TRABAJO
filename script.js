@@ -598,6 +598,14 @@ function activarPestana(panel) {
     const pane = document.getElementById('pane-' + p);
     if (pane) pane.classList.toggle('oculto', p !== panel);
   });
+  // Al cambiar de pestaña, el título de la página (pestaña del navegador y
+  // título del hero) también cambia: TRABAJOS <-> CURSOS.
+  const esCursos = panel === 'cursos';
+  document.title = esCursos
+    ? 'LYGANDO CURSOS - Cursos gratuitos con certificado del Perú'
+    : 'LYGANDO TRABAJOS - Ofertas de empleo en el Perú';
+  const heroTitulo = document.querySelector('.hero h1');
+  if (heroTitulo) heroTitulo.innerHTML = esCursos ? 'LYGANDO <span>CURSOS</span>' : 'LYGANDO <span>TRABAJOS</span>';
 }
 
 document.getElementById('panelTabs').addEventListener('click', e => {

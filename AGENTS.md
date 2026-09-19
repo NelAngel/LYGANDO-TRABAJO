@@ -217,6 +217,19 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   certificado (`.cur .categoria:has(.tipo-certificado) { background: transparent }`).
   OJO: el CSS viejo `.cur .badge-certificado` se ELIMINÓ (nunca se usaba; el JS emite
   `tipo-certificado`), no reintroducirlo.
+- **TIPOGRAFÍA Ubuntu** (2026-09-18): la página usa la fuente **Ubuntu** de Google Fonts
+  (`<link>` en el `<head>` de `index.html`, weights 300-700, fallback Segoe UI/Arial).
+  Títulos con `font-weight:700`, `letter-spacing` y algunos en mayúsculas (h1 del hero,
+  títulos de tarjeta, cabeceras de segmento) para un look más ordenado; cuerpo con
+  `line-height` ~1.5-1.6. Todos los `font-weight:800` se cambiaron a `700` (Ubuntu no
+  tiene el 800). Si el visitante está sin internet, cae a la fuente del sistema.
+- **Título dinámico por pestaña** (2026-09-18): al pulsar CURSOS, `activarPestana()` en
+  `script.js` cambia `document.title` a "LYGANDO CURSOS - Cursos gratuitos con certificado
+  del Perú" y el h1 del hero a "LYGANDO CURSOS"; al volver a TRABAJOS se restaura.
+- **Texto justificado** (2026-09-18): los párrafos (`.hero p`, `.tarjeta .descripcion`,
+  `.destacado-tarjeta .entradilla`, `.como-aplicar p`, `.paso p`, `.piefooter p`,
+  `.vacio/.cargando`) van con `text-align: justify` + `hyphens: auto` para que no queden
+  desalineados.
 
 ## Estado actual (snapshot 2026-09-18 — 17 imágenes nuevas subidas)
 
