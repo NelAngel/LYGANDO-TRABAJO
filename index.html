@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="LYGANDO TRABAJOS - Ofertas de empleo reales del Perú: anuncios de empresas, convocatorias ONPE y cursos gratuitos con certificado. Filtra por puesto, región o contacto y aplica directo.">
+  <title>LYGANDO TRABAJOS - Ofertas de empleo en el Perú</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --naranja: #e95420;
+      --naranja-oscuro: #b3350f;
+      --aubergine: #772953;
+      --casi-negro: #2c001e;
+      --fondo: #faf8f6;
+      --texto: #3a3a3a;
+      --gris: #888;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+      line-height: 1.5;
+    }
+    a { color: var(--naranja); text-decoration: none; }
+
+    /* ---------- Barra superior oscura ---------- */
+    .topbar {
+      background: var(--casi-negro);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 22px;
+      letter-spacing: 0.5px;
+    }
+    .logo .circulo {
+      width: 36px;
+      height: 36px;
+      background: var(--naranja);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 18px;
+    }
+    .nav { display: flex; gap: 24px; font-size: 14px; font-weight: 600; }
+    .nav a { color: #e7d8e3; }
+    .nav a:hover { color: #fff; }
+
+    /* ---------- Hero ---------- */
+    .hero {
+      background:
+        radial-gradient(circle at 85% 20%, rgba(233,84,32,0.35), transparent 40%),
+        radial-gradient(circle at 8% 90%, rgba(119,41,83,0.5), transparent 45%),
+        var(--casi-negro);
+      color: #fff;
+      padding: 56px 28px 64px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 42px; font-weight: 800; }
+    .hero h1 span { color: var(--naranja); }
+    .hero p { margin: 12px auto 0; max-width: 640px; color: #d9d2d6; font-size: 17px; }
+    .hero .destacado-banner {
+      display: inline-block;
+      margin-top: 20px;
+      background: rgba(233,84,32,0.2);
+      border: 1px solid rgba(233,84,32,0.6);
+      color: #ffd5c0;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+    }
+
+    /* ---------- Estadísticas ---------- */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin-top: -34px;
+      padding: 0 28px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 5;
+    }
+    .stat {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      padding: 16px 26px;
+      text-align: center;
+      min-width: 130px;
+      border-bottom: 4px solid var(--naranja);
+    }
+    .stat .numero { font-size: 28px; font-weight: 800; color: var(--naranja); }
+    .stat .etiqueta { font-size: 13px; color: var(--gris); }
+
+    /* ---------- Contenido ---------- */
+    .contenido { max-width: 1040px; margin: 0 auto; padding: 26px 20px; }
+    .seccion-titulo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 26px 0 4px;
+    }
+    .seccion-titulo .barra {
+      width: 8px;
+      height: 30px;
+      background: var(--naranja);
+      border-radius: 4px;
+    }
+    .seccion-titulo h2 { font-size: 24px; color: var(--casi-negro); }
+    .seccion-titulo small { color: var(--gris); font-weight: normal; font-size: 14px; }
+
+    /* ---------- Pestañas TRABAJOS / CURSOS ---------- */
+    .panel-tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .pestana {
+      flex: 1;
+      padding: 18px;
+      border: 2px solid #e3d8de;
+      background: #fff;
+      border-radius: 16px;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      color: var(--casi-negro);
+      transition: 0.15s;
+    }
+    .pestana:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.1); }
+    .pestana[data-panel="trabajos"].activa { background: var(--naranja); border-color: var(--naranja); color: #fff; }
+    .pestana[data-panel="cursos"].activa { background: #127a3c; border-color: #127a3c; color: #fff; }
+
+    /* ---------- Franja gigante (cabecera de la pestaña CURSOS) ---------- */
+    .franja-gigante {
+      margin: 18px 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: linear-gradient(120deg, var(--naranja), #16a34a);
+      color: #fff;
+      padding: 22px 18px;
+      border-radius: 16px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    .franja-gigante .franja-lado { font-size: 22px; }
+    .franja-gigante .franja-centro {
+      width: 46px; height: 46px; line-height: 46px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+    .franja-gigante small { display: block; font-size: 12px; letter-spacing: 0; opacity: 0.95; font-weight: 600; }
+
+    /* ---------- Destacado ---------- */
+    .destacado-grid {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 18px;
+    }
+    .destacado-tarjeta {
+      position: relative;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid #f3e0d6;
+      border-radius: 18px;
+      padding: 22px 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 12px 28px rgba(233,84,32,0.12);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .destacado-tarjeta::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 6px;
+      background: linear-gradient(90deg, var(--naranja), var(--aubergine));
+    }
+    .destacado-tarjeta::after {
+      content: '';
+      position: absolute; top: -46px; right: -46px; width: 150px; height: 150px;
+      background: radial-gradient(circle, rgba(233,84,32,0.18), transparent 70%);
+      pointer-events: none;
+    }
+    .destacado-tarjeta:hover { transform: translateY(-5px); box-shadow: 0 18px 36px rgba(233,84,32,0.22); }
+    .destacado-tarjeta > * { position: relative; }
+    .destacado-tarjeta .dest-top { display: flex; align-items: center; gap: 6px; }
+    .destacado-tarjeta .desta-rango {
+      flex: none;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--naranja), var(--aubergine));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 3px 8px rgba(233,84,32,0.35);
+    }
+    .destacado-tarjeta .desta-rango i { font-style: normal; font-size: 9px; font-weight: 700; }
+    .destacado-tarjeta .categoria { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 5px; }
+    .destacado-tarjeta .dest-pin {
+      margin-left: auto;
+      background: linear-gradient(120deg, var(--naranja), #f27f5e);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      box-shadow: 0 4px 10px rgba(233,84,32,0.45);
+      white-space: nowrap;
+      flex: none;
+    }
+    .destacado-tarjeta .tipo { padding: 4px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; }
+    .destacado-tarjeta .tipo .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
+    .destacado-tarjeta h3 { font-size: 19px; line-height: 1.3; text-transform: uppercase; color: var(--casi-negro); }
+    .destacado-tarjeta .meta { color: var(--gris); font-size: 13px; }
+    .destacado-tarjeta .entradilla { color: var(--texto); font-size: 14px; flex: 1; }
+    .destacado-tarjeta .sueldo {
+      align-self: flex-start;
+      background: #fff4ef;
+      color: var(--naranja);
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      border: 1px solid #ffd9c7;
+    }
+    .destacado-tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+
+    /* ---------- Chips ---------- */
+    .regionenlaces { margin-top: 26px; }
+    .regionenlaces .fila { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1.5px solid #e3d8de;
+      background: #fff;
+      color: var(--casi-negro);
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .chip:hover { border-color: var(--naranja); color: var(--naranja); }
+    .chip.activa { background: var(--naranja); border-color: var(--naranja); color: #fff; }
+
+    /* ---------- Controles ---------- */
+    .controles {
+      margin: 20px 0 6px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      padding: 14px;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .buscador {
+      flex: 1 1 240px;
+      padding: 12px 16px;
+      border: 1.5px solid #e3d8de;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      color: var(--texto);
+    }
+    .buscador:focus { border-color: var(--naranja); box-shadow: 0 0 0 3px rgba(233,84,32,0.15); }
+    .filtro {
+      padding: 11px 18px;
+      border: 1.5px solid #e3d8de;
+      background: #fff;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--casi-negro);
+    }
+    .filtro.activo { background: var(--naranja); color: #fff; border-color: var(--naranja); }
+
+    /* ---------- Cuadrícula ---------- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+    .tarjeta {
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px;
+      border: 1px solid #eee;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .tarjeta:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+    .tarjeta .categoria { display: inline-flex; align-self: flex-start; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .tarjeta .tipo { padding: 4px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; }
+    .tarjeta .tipo .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
+    .tipo-enlace { background: #ffe9e0; color: var(--naranja); }
+    .tipo-whatsapp {
+      background: linear-gradient(135deg, #b9f0cf, #e9fbef);
+      color: #128c4b;
+      border: 1.5px solid #86e0ab;
+      box-shadow: 0 2px 8px rgba(18,140,75,0.18);
+    }
+    .tipo-whatsapp .pt { background: #128c4b; }
+    .tipo-llamada {
+      background: linear-gradient(135deg, #bfdbfe, #eff6ff);
+      color: #1d4ed8;
+      border: 1.5px solid #93c5fd;
+      box-shadow: 0 2px 8px rgba(29,78,216,0.18);
+    }
+    .tipo-llamada .pt { background: #1d4ed8; }
+    .tipo-fecha {
+      background: linear-gradient(135deg, #fde68a, #fffbeb);
+      color: #b45309;
+      border: 1.5px solid #fcd34d;
+      box-shadow: 0 2px 8px rgba(180,83,9,0.18);
+      white-space: nowrap;
+    }
+    .tipo-fecha .pt { background: #b45309; }
+    /* Píldoras LLAMADA, WHATSAPP y FECHA más pequeñas que el resto */
+    .tarjeta .tipo-llamada, .tarjeta .tipo-whatsapp, .tarjeta .tipo-fecha,
+    .destacado-tarjeta .tipo-llamada, .destacado-tarjeta .tipo-whatsapp, .destacado-tarjeta .tipo-fecha {
+      padding: 2px 8px;
+      font-size: 10px;
+      letter-spacing: 0.3px;
+      gap: 4px;
+    }
+    .tarjeta .tipo-llamada .pt, .tarjeta .tipo-whatsapp .pt, .tarjeta .tipo-fecha .pt,
+    .destacado-tarjeta .tipo-llamada .pt, .destacado-tarjeta .tipo-whatsapp .pt, .destacado-tarjeta .tipo-fecha .pt {
+      width: 5px;
+      height: 5px;
+    }
+    .tarjeta .origen {
+      margin-left: auto;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      background: #eef0f4;
+      color: #6b7280;
+    }
+    .tarjeta .origen-scrap { background: #ede9fe; color: #6d28d9; }
+    .tarjeta .titulo { font-size: 19px; font-weight: 700; color: var(--casi-negro); line-height: 1.35; text-transform: uppercase; }
+    .tarjeta .meta { font-size: 13px; color: var(--gris); }
+    .tarjeta .descripcion { font-size: 14px; color: var(--texto); flex: 1; }
+    .tarjeta .sueldo {
+      align-self: flex-start;
+      font-weight: 800;
+      color: var(--naranja);
+      background: #fff4ef;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+    }
+    .tarjeta .botones { display: flex; gap: 10px; flex-wrap: wrap; }
+    .boton {
+      display: inline-block;
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+      transition: filter 0.15s;
+    }
+    .boton:hover { filter: brightness(1.1); }
+    .boton-whatsapp { background: #25d366; }
+    .boton-llamada { background: #1d4ed8; }
+
+    /* ---------- CURSOS Capacita-T (MTPE) ----------
+       Sección aparte (trabajos arriba, cursos debajo). Título con barra VERDE
+       Capacita y tarjetas de curso (duración + certificado + botones propios). */
+    .seccion-cursos { margin-top: 46px; }
+    .seccion-cursos .barra { background: var(--verde) !important; }
+    .seccion-cursos .seccion-titulo h2 { color: #127a3c; }
+    .seccion-cursos .seccion-titulo small { color: var(--gris); }
+    .seccion-cursos .grid { margin-top: 16px; }
+    /* Lista de cursos agrupada por SEGMENTO (entidad que emite):
+       cada segmento es una columna con su cabecera y su propia cuadricula. */
+    #listaCursos { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+    .segmento { display: flex; flex-direction: column; }
+    .segmento-titulo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 4px;
+      padding: 10px 18px;
+      background: #fff;
+      border-left: 10px solid var(--naranja);
+      border-radius: 12px;
+      font-size: 19px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--casi-negro);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .segmento-n {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .seg-mtpe  { border-left-color: #16a34a; } .seg-mtpe  .segmento-n { background: #16a34a; }
+    .seg-cisco { border-left-color: #2563eb; } .seg-cisco .segmento-n { background: #2563eb; }
+    .seg-huawei{ border-left-color: #dc2626; } .seg-huawei .segmento-n { background: #dc2626; }
+    .seg-romero{ border-left-color: #ea580c; } .seg-romero .segmento-n { background: #ea580c; }
+    .seg-bcp   { border-left-color: #0f766e; } .seg-bcp   .segmento-n { background: #0f766e; }
+    .seg-otro  { border-left-color: #6b7280; } .seg-otro  .segmento-n { background: #6b7280; }
+    /* ---------- Filtros SUPERIORES de color (cursos: institución; trabajos: origen) ---------- */
+    /* En vez de un panel lateral bajo, los botones van ARRIBA de la lista para
+       que el visitante escoja el segmento sin tener que bajar. */
+    .filtros-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0 4px;
+    }
+    .segfiltro {
+      display: flex; align-items: center; gap: 9px;
+      padding: 11px 16px;
+      border: 2px solid #e9e2e6;
+      background: #fff;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--casi-negro);
+      cursor: pointer;
+      text-align: left;
+      transition: 0.15s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .segfiltro:hover { transform: translateY(-2px); border-color: var(--naranja); box-shadow: 0 6px 14px rgba(0,0,0,0.1); }
+    .segfiltro .punto { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 0 3px #f1ecef; }
+    .segfiltro .n {
+      margin-left: auto; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+      color: var(--casi-negro); background: #eef0f4; border-radius: 999px; padding: 2px 10px;
+    }
+    .segfiltro.activa { color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
+    .segfiltro.activa .punto { box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+    .segfiltro.activa .n { color: #fff; background: rgba(255,255,255,0.3); }
+    .segfiltro.activa.segf-todos  { background: linear-gradient(120deg, var(--naranja), var(--aubergine)); }
+    .segfiltro.activa.segf-mtpe   { background: #16a34a; }
+    .segfiltro.activa.segf-cisco  { background: #2563eb; }
+    .segfiltro.activa.segf-huawei { background: #dc2626; }
+    .segfiltro.activa.segf-romero { background: #ea580c; }
+    .segfiltro.activa.segf-bcp    { background: #0f766e; }
+    .segfiltro.activa.segf-otro   { background: #6b7280; }
+    .segfiltro.activa.segf-foto   { background: var(--naranja); }
+    .segfiltro.activa.segf-portal { background: #7c3aed; }
+    .cur .categoria { background: #e6f6ec; color: #127a3c; }
+    .cur .badge-certificado {
+      display: inline-block; background: #127a3c; color: #fff;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+      padding: 4px 12px; border-radius: 999px;
+    }
+    .cur .duracion {
+      display: inline-block; background: #fff7ed; color: #9a3412;
+      font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+    }
+    .boton-empezar { background: #16a34a; }
+    .boton-verruta { background: var(--casi-negro); color: #fff; }
+    .boton-funciones { background: #2563eb; }
+    .boton-postular { background: #0f766e; }
+
+    .vacio, .cargando {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: var(--gris);
+      padding: 40px;
+      background: #fff;
+      border-radius: 14px;
+      border: 2px dashed #e3d8de;
+    }
+    .oculto { display: none !important; }
+
+    /* ---------- Cómo aplicar ---------- */
+    .como-aplicar {
+      margin-top: 34px;
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #eee;
+      padding: 26px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .como-aplicar h3 { color: var(--casi-negro); font-size: 20px; grid-column: 1 / -1; }
+    .paso { display: flex; gap: 12px; align-items: flex-start; }
+    .paso .num {
+      min-width: 34px;
+      height: 34px;
+      background: var(--naranja);
+      color: #fff;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+    .paso p { font-size: 13.5px; color: var(--texto); }
+
+    /* ---------- Footer ---------- */
+    .piefooter {
+      margin-top: 40px;
+      background: var(--casi-negro);
+      color: #cfc4c9;
+      padding: 36px 24px 18px;
+    }
+    .piefooter .columnas {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 26px;
+    }
+    .piefooter h4 { color: #fff; margin-bottom: 12px; font-size: 15px; }
+    .piefooter ul { list-style: none; }
+    .piefooter li { margin-bottom: 7px; font-size: 13px; }
+    .piefooter a { color: #cfc4c9; }
+    .piefooter a:hover { color: var(--naranja); }
+    .copyright {
+      max-width: 1040px;
+      margin: 26px auto 0;
+      border-top: 1px solid #472544;
+      padding-top: 14px;
+      text-align: center;
+      font-size: 12px;
+      color: #7c6b73;
+    }
+
+    @media (max-width: 720px) {
+      .hero h1 { font-size: 30px; }
+      .nav { order: 3; width: 100%; justify-content: space-around; }
+    }
+    @media (max-width: 900px) {
+      .filtros-top { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+      .filtros-top::-webkit-scrollbar { display: none; }
+      .segfiltro { flex: 1 0 auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="circulo">L</span>LYGANDO<span style="color:#e95420;"> TRABAJOS</span></a>
+    <nav class="nav">
+      <a href="index.html">Inicio</a>
+      <a href="#ofertas">Ofertas</a>
+      <a href="#como-aplicar">Cómo aplicar</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>LYGANDO <span>TRABAJOS</span></h1>
+    <p>Ofertas de empleo reales del Perú en un solo lugar: anuncios de las empresas, convocatorias públicas de ONPE y cursos gratuitos con certificado. Encuentra tu puesto, revisa los requisitos y aplica directo por WhatsApp, llamada o postulación oficial.</p>
+    <span class="destacado-banner" id="bannerResumen">Cargando ofertas...</span>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><div class="numero" id="stTotal">0</div><div class="etiqueta">Ofertas</div></div>
+    <div class="stat"><div class="numero" id="stEnlace">0</div><div class="etiqueta">Con enlace</div></div>
+    <div class="stat"><div class="numero" id="stWhatsapp">0</div><div class="etiqueta">Con WhatsApp</div></div>
+    <div class="stat"><div class="numero" id="stLlamada">0</div><div class="etiqueta">Con llamada</div></div>
+    <div class="stat"><div class="numero" id="stZonas">0</div><div class="etiqueta">Regiones</div></div>
+  </section>
+
+  <main class="contenido">
+    <div class="panel-tabs" id="panelTabs">
+      <button class="pestana activa" data-panel="trabajos">TRABAJOS</button>
+      <button class="pestana" data-panel="cursos">CURSOS</button>
+    </div>
+
+    <section id="pane-trabajos">
+    <div class="seccion-titulo">
+      <span class="barra"></span>
+      <h2>Ofertas destacadas <small>· las más recientes</small></h2>
+    </div>
+    <section id="destacado"></section>
+
+    <div class="seccion-titulo">
+      <span class="barra"></span>
+      <h2>Buscar por región</h2>
+    </div>
+    <section class="regionenlaces">
+      <div class="fila" id="chipUbicaciones"></div>
+    </section>
+
+    <section id="ofertas" class="caja-bloque caja-ofertas">
+      <div class="filtros-top" id="filtroOrigen">
+        <p style="font-size:13px;color:#888;">Cargando origen...</p>
+      </div>
+      <div class="controles">
+        <input type="text" class="buscador" id="buscador" placeholder="Buscar por puesto, empresa o región... (ej: repartidor gas)">
+        <button class="filtro activo" data-filtro="todo">TODAS</button>
+        <button class="filtro" data-filtro="enlace">CON ENLACE</button>
+        <button class="filtro" data-filtro="whatsapp">CON WHATSAPP</button>
+        <button class="filtro" data-filtro="llamada">CON LLAMADA</button>
+      </div>
+      <div class="grid" id="lista">
+        <p class="cargando">Cargando ofertas...</p>
+      </div>
+    </section>
+    </section>
+    <!-- ===== /pane-trabajos ===== -->
+
+    <section id="pane-cursos" class="oculto">
+    <!-- ===== FRANJA GIGANTE cabecera de la pestaña CURSOS ===== -->
+    <div class="franja-gigante">
+      <span class="franja-lado franja-izq">CURSOS GRATUITOS</span>
+      <span class="franja-centro">Con</span>
+      <span class="franja-lado franja-der">CERTIFICADO</span>
+    </div>
+    <!-- ===== /franja ===== -->
+
+    <!-- ---------- CURSOS GRATUITOS CAPACITA-T (MTPE) ----------
+         Fuente: cursos.xlsx generado por scraper_capacita.py.
+         Los cursos NO caducan -> siempre visibles (regla del usuario). -->
+    <section id="cursos" class="seccion-cursos caja-bloque caja-cursos">
+      <div class="seccion-titulo">
+        <span class="barra"></span>
+        <h2><span style="color:var(--naranja);">Cursos gratuitos</span> Capacita-T <small>MTPE · separados por la institución que los emite (MTPE, Cisco, Huawei, Fundación Romero, ABC del BCP)</small></h2>
+      </div>
+      <div class="filtros-top" id="segmentosFiltros">
+        <p style="font-size:13px;color:#888;">Cargando instituciones...</p>
+      </div>
+      <div class="controles">
+        <input type="text" class="buscador" id="buscadorCursos" placeholder="Buscar curso, institución o tema... (ej: excel)">
+      </div>
+      <div id="listaCursos">
+        <p class="cargando">Cargando cursos gratuitos...</p>
+      </div>
+    </section>
+    </section>
+    <!-- ===== /pane-cursos ===== -->
+
+    <section class="como-aplicar" id="como-aplicar">
+      <h3>Cómo usar la página</h3>
+      <p style="grid-column:1/-1; font-size:14px; color:var(--texto);">Usa el buscador y los filtros para encontrar tu oferta (por puesto, empresa, región, fuente o tipo de contacto). En cada tarjeta verás cuándo fue publicada la oferta. Para aplicar, pulsa el botón que trae la tarjeta.</p>
+      <div class="paso">
+        <span class="num">1</span>
+        <p>Revisa la oferta que te interesa y confirma los requisitos.</p>
+      </div>
+      <div class="paso">
+        <span class="num">2</span>
+        <p>Si tiene botón <strong style="color:#25d366;">WHATSAPP</strong>, abre el chat directo con tu mensaje ya preparado.</p>
+      </div>
+      <div class="paso">
+        <span class="num">3</span>
+        <p>Si tiene botón <strong style="color:#1d4ed8;">LLAMAR</strong>, marca directo al puesto (el trato es por llamada).</p>
+      </div>
+      <div class="paso">
+        <span class="num">4</span>
+        <p>Si tiene botón <strong style="color:#0f766e;">POSTULAR</strong>, te lleva directo al sistema de convocatorias de ONPE.</p>
+      </div>
+      <div class="paso">
+        <span class="num">5</span>
+        <p>El botón <strong style="color:#2563eb;">FUNCIONES</strong> abre el PDF oficial con las funciones del puesto.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="piefooter">
+    <div class="columnas">
+      <div>
+        <h4>LYGANDO TRABAJOS</h4>
+        <p style="font-size:13px;">Página peruana de ofertas de empleo recopiladas de fuentes públicas, páginas web y redes sociales: anuncios de empresas, convocatorias públicas y cursos gratuitos con certificado. Todas las vacantes para que apliques directo y de forma simple.</p>
+      </div>
+      <div>
+        <h4>Enlaces</h4>
+        <ul>
+          <li><a href="index.html">Inicio</a></li>
+          <li><a href="#ofertas">Ver ofertas</a></li>
+          <li><a href="#cursos">Cursos gratuitos</a></li>
+          <li><a href="#como-aplicar">Cómo aplicar</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Regiones con empleo</h4>
+        <ul id="footerZonas"><li>Próximamente</li></ul>
+      </div>
+    </div>
+    <div class="copyright">&copy; 2026 LYGANDO TRABAJOS - Ofertas de fuentes públicas</div>
+  </footer>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
