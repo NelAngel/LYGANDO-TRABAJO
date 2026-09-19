@@ -1,6 +1,10 @@
 // LYGANDO TRABAJOS: lee dos Excels (la BD) y muestra los anuncios.
 //  - ofertas.xlsx        : anuncios de FOTOS (manual)
 //  - convocatorias.xlsx  : convocatorias por SCRAPING (scraper_onpe.py)
+// La página entra SIEMPRE por arriba: evita que el navegador restaure el
+// scroll de la visita anterior (que dejaba la vista en "Cómo usar la página").
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.scrollTo(0, 0);
 const FUENTES = [
   { archivo: 'ofertas.xlsx', _origen: 'Foto' },
   { archivo: 'convocatorias.xlsx', _origen: 'Portaltrabajo' },
@@ -615,3 +619,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 
 // Si la URL llega con #cursos, abrir directamente la pestaña de cursos.
 if (location.hash && location.hash.indexOf('#cursos') === 0) activarPestana('cursos');
+
+// La vista queda SIEMPRE arriba al cargar, aunque el enlace compartido venga
+// con un ancla (p.ej. #como-aplicar): se muestra el inicio, no la última sección.
+window.scrollTo(0, 0);
+try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}

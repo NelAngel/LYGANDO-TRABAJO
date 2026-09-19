@@ -189,6 +189,35 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
 - **SELLO de empresa manda**: ver SELLOS. En dudas de nombre real (sello/logotipo),
   correr `ocr_multi.py` y confirmar con el usuario.
 
+## DISEÑO / GIT (2026-09-18)
+- **GIT conectado**: repo GitHub `NelAngel/LYGANDO-TRABAJO` (remote `origin`),
+  rama `main`. Se subió con `.gitignore` que ignora `__pycache__/`, `*.pyc` y
+  `.~lock.*#` (bloqueos de LibreOffice); esos archivos ya se quitaron del tracking
+  (`git rm --cached`). Al cambiar algo importante, recordar: `git add -A && git commit`
+  y `git push` (SOLO si el usuario lo pide).
+- **La página entra SIEMPRE por arriba** (decisión del usuario 2026-09-18): al cargar,
+  `script.js` fuerza scroll al inicio (`scrollRestoration='manual'` + `scrollTo(0,0)` al
+  inicio y al final, y `history.replaceState` limpia el ancla). Sirve para el caso "lo
+  comparto por git y a la otra persona le aparecía 'Cómo usar la página' en vez del
+  inicio" (el navegador restauraba el scroll de la visita anterior).
+- **Fondo de la página BLANCO** (`--fondo: #faf8f6`). Se probó naranja Ubuntu de fondo
+  (2026-09-18) y al usuario NO le gustó: se revirtió. El color va en las TARJETAS, no en
+  el fondo.
+- **TARJETAS naranja Ubuntu con estilo** (2026-09-18): `.tarjeta` (trabajos y cursos,
+  los cursos usan `class="tarjeta tarjeta-curso"`) tienen fondo en GRADIENTE naranja
+  Ubuntu (`linear-gradient(165deg,#f5713a,#e95420,#d4400e)`), borde `#c03a0a`, sombra
+  naranja, línea superior brillante (`::before`) y hover que las eleva. `destacado-tarjeta`
+  igual + brillo radial superior. Texto de la tarjeta en BLANCO (`titulo` con sombra,
+  `meta`/`descripcion` blanco translúcido); el pin "DESTACADO" (`dest-pin`) y el número
+  (`desta-rango`) pasaron a píldora BLANCA con texto naranja para resaltar.
+- **Badge "Certificado" de los cursos** (2026-09-18): antes salía verde apagado; ahora
+  `.tipo-certificado` es una píldora DORADA con brillo (gradiente `#ffd25e→#d18a0c`),
+  estrellita `✦` antes del texto y un DESTELLO que recorre el botón cada ~2.8s
+  (`@keyframes centellaCertificado`). El `.categoria` verde se quita cuando hay
+  certificado (`.cur .categoria:has(.tipo-certificado) { background: transparent }`).
+  OJO: el CSS viejo `.cur .badge-certificado` se ELIMINÓ (nunca se usaba; el JS emite
+  `tipo-certificado`), no reintroducirlo.
+
 ## Estado actual (snapshot 2026-09-18 — 17 imágenes nuevas subidas)
 
 **17 imágenes nuevas del 18/09 en `images/`, de las cuales 2 eran DUPLICADOS SHA-1 de

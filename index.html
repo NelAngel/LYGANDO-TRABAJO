@@ -180,63 +180,65 @@
     .destacado-tarjeta {
       position: relative;
       overflow: hidden;
-      background: #fff;
-      border: 1px solid #f3e0d6;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(255,255,255,0.16), transparent 45%),
+        linear-gradient(165deg, #f5713a 0%, #e95420 55%, #c73a0b 100%);
+      border: 1px solid #c03a0a;
       border-radius: 18px;
       padding: 22px 20px 22px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      box-shadow: 0 12px 28px rgba(233,84,32,0.12);
+      box-shadow: 0 14px 32px rgba(200,60,10,0.32);
       transition: transform 0.18s, box-shadow 0.18s;
     }
     .destacado-tarjeta::before {
       content: '';
       position: absolute; top: 0; left: 0; right: 0; height: 6px;
-      background: linear-gradient(90deg, var(--naranja), var(--aubergine));
+      background: linear-gradient(90deg, #fff, rgba(255,255,255,0));
     }
     .destacado-tarjeta::after {
       content: '';
       position: absolute; top: -46px; right: -46px; width: 150px; height: 150px;
-      background: radial-gradient(circle, rgba(233,84,32,0.18), transparent 70%);
+      background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
       pointer-events: none;
     }
-    .destacado-tarjeta:hover { transform: translateY(-5px); box-shadow: 0 18px 36px rgba(233,84,32,0.22); }
+    .destacado-tarjeta:hover { transform: translateY(-5px); box-shadow: 0 18px 36px rgba(200,60,10,0.3); }
     .destacado-tarjeta > * { position: relative; }
     .destacado-tarjeta .dest-top { display: flex; align-items: center; gap: 6px; }
     .destacado-tarjeta .desta-rango {
       flex: none;
       width: 26px; height: 26px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--naranja), var(--aubergine));
-      color: #fff;
+      background: #fff;
+      color: var(--naranja);
       font-size: 12px;
       font-weight: 800;
       display: grid;
       place-items: center;
-      box-shadow: 0 3px 8px rgba(233,84,32,0.35);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
     }
     .destacado-tarjeta .desta-rango i { font-style: normal; font-size: 9px; font-weight: 700; }
     .destacado-tarjeta .categoria { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 5px; }
     .destacado-tarjeta .dest-pin {
       margin-left: auto;
-      background: linear-gradient(120deg, var(--naranja), #f27f5e);
-      color: #fff;
+      background: #fff;
+      color: var(--naranja);
       font-size: 10px;
       font-weight: 800;
       letter-spacing: 0.4px;
       text-transform: uppercase;
       padding: 2px 8px;
       border-radius: 999px;
-      box-shadow: 0 4px 10px rgba(233,84,32,0.45);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       white-space: nowrap;
       flex: none;
     }
     .destacado-tarjeta .tipo { padding: 4px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; }
     .destacado-tarjeta .tipo .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
-    .destacado-tarjeta h3 { font-size: 19px; line-height: 1.3; text-transform: uppercase; color: var(--casi-negro); }
-    .destacado-tarjeta .meta { color: var(--gris); font-size: 13px; }
-    .destacado-tarjeta .entradilla { color: var(--texto); font-size: 14px; flex: 1; }
+    .destacado-tarjeta h3 { font-size: 19px; line-height: 1.3; text-transform: uppercase; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+    .destacado-tarjeta .meta { color: rgba(255,255,255,0.88); font-size: 13px; }
+    .destacado-tarjeta .entradilla { color: rgba(255,255,255,0.95); font-size: 14px; flex: 1; }
     .destacado-tarjeta .sueldo {
       align-self: flex-start;
       background: #fff4ef;
@@ -308,17 +310,24 @@
       margin-top: 18px;
     }
     .tarjeta {
-      background: #fff;
-      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(165deg, #f5713a 0%, #e95420 50%, #d4400e 100%);
+      border-radius: 18px;
       padding: 22px;
-      border: 1px solid #eee;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      border: 1px solid #c03a0a;
+      box-shadow: 0 6px 20px rgba(233,84,32,0.28), inset 0 1px 0 rgba(255,255,255,0.22);
       display: flex;
       flex-direction: column;
       gap: 10px;
       transition: transform 0.15s, box-shadow 0.15s;
     }
-    .tarjeta:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+    .tarjeta::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #ffdcc8, rgba(255,255,255,0.12));
+    }
+    .tarjeta:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(200,60,10,0.34), inset 0 1px 0 rgba(255,255,255,0.22); }
     .tarjeta .categoria { display: inline-flex; align-self: flex-start; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
     .tarjeta .tipo { padding: 4px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; }
     .tarjeta .tipo .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
@@ -370,9 +379,12 @@
       color: #6b7280;
     }
     .tarjeta .origen-scrap { background: #ede9fe; color: #6d28d9; }
-    .tarjeta .titulo { font-size: 19px; font-weight: 700; color: var(--casi-negro); line-height: 1.35; text-transform: uppercase; }
-    .tarjeta .meta { font-size: 13px; color: var(--gris); }
-    .tarjeta .descripcion { font-size: 14px; color: var(--texto); flex: 1; }
+    .tarjeta .titulo {
+      font-size: 19px; font-weight: 700; color: #fff; line-height: 1.35;
+      text-transform: uppercase; text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+    .tarjeta .meta { font-size: 13px; color: rgba(255,255,255,0.88); }
+    .tarjeta .descripcion { font-size: 14px; color: rgba(255,255,255,0.95); flex: 1; }
     .tarjeta .sueldo {
       align-self: flex-start;
       font-weight: 800;
@@ -482,10 +494,39 @@
     .segfiltro.activa.segf-foto   { background: var(--naranja); }
     .segfiltro.activa.segf-portal { background: #7c3aed; }
     .cur .categoria { background: #e6f6ec; color: #127a3c; }
-    .cur .badge-certificado {
-      display: inline-block; background: #127a3c; color: #fff;
-      font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
-      padding: 4px 12px; border-radius: 999px;
+    .cur .categoria:has(.tipo-certificado) { background: transparent; }
+    .tipo-certificado {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #ffd25e 0%, #f2b322 45%, #d18a0c 100%);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 999px;
+      box-shadow: 0 3px 12px rgba(224,161,28,0.55), inset 0 1px 0 rgba(255,255,255,0.55);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+    }
+    .tipo-certificado::before {
+      content: '✦';
+      font-size: 10px;
+      line-height: 1;
+    }
+    .tipo-certificado::after {
+      content: '';
+      position: absolute; top: -20%; left: -55%;
+      width: 35%; height: 140%;
+      background: linear-gradient(105deg, transparent, rgba(255,255,255,0.8), transparent);
+      transform: skewX(-20deg);
+      animation: centellaCertificado 2.8s infinite;
+    }
+    @keyframes centellaCertificado {
+      0% { left: -55%; opacity: 0; }
+      18% { opacity: 1; }
+      55% { left: 125%; opacity: 0; }
+      100% { left: 125%; opacity: 0; }
     }
     .cur .duracion {
       display: inline-block; background: #fff7ed; color: #9a3412;
