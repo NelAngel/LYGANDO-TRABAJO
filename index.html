@@ -337,6 +337,22 @@
       background: linear-gradient(90deg, #ffdcc8, rgba(255,255,255,0.12));
     }
     .tarjeta:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(200,60,10,0.34), inset 0 1px 0 rgba(255,255,255,0.22); }
+
+    /* Foto ilustrativa del rubro (mina, cocina, tienda...): borde a borde arriba */
+    .tarjeta-foto {
+      width: auto;
+      height: 150px;
+      object-fit: cover;
+      object-position: center;
+      border-radius: 17px 17px 0 0;
+      margin: -22px -22px 8px;
+      mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    }
+    .destacado-tarjeta > .tarjeta-foto {
+      height: 165px;
+      margin: -22px -20px 8px;
+    }
     .tarjeta .categoria { display: inline-flex; align-self: flex-start; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
     .tarjeta .tipo { padding: 4px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; }
     .tarjeta .tipo .pt { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
@@ -471,6 +487,26 @@
       gap: 10px;
       margin: 14px 0 4px;
     }
+    .lbl-inst {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--aubergine);
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      align-self: center;
+    }
+    .select-institucion {
+      padding: 10px 14px;
+      border: 1.5px solid #e3d8de;
+      border-radius: 10px;
+      font-size: 13.5px;
+      color: var(--texto);
+      background: #fff;
+      max-width: 100%;
+      outline: none;
+      cursor: pointer;
+    }
+    .select-institucion:focus { border-color: var(--naranja); box-shadow: 0 0 0 3px rgba(233,84,32,0.15); }
     .segfiltro {
       display: flex; align-items: center; gap: 9px;
       padding: 11px 16px;
@@ -546,6 +582,7 @@
     .boton-verruta { background: var(--casi-negro); color: #fff; }
     .boton-funciones { background: #2563eb; }
     .boton-postular { background: #0f766e; }
+    .boton-convocatoria { background: #0284c7; }
 
     .vacio, .cargando {
       grid-column: 1 / -1;
@@ -673,7 +710,7 @@
 
     <section id="ofertas" class="caja-bloque caja-ofertas">
       <div class="filtros-top" id="filtroOrigen">
-        <p style="font-size:13px;color:#888;">Cargando origen...</p>
+        <p style="font-size:13px;color:#888;">Cargando instituciones...</p>
       </div>
       <div class="controles">
         <input type="text" class="buscador" id="buscador" placeholder="Buscar por puesto, empresa o región... (ej: repartidor gas)">

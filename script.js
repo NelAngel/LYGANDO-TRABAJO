@@ -8,6 +8,9 @@ window.scrollTo(0, 0);
 const FUENTES = [
   { archivo: 'ofertas.xlsx', _origen: 'Foto' },
   { archivo: 'convocatorias.xlsx', _origen: 'Portaltrabajo' },
+  // Convocatorias del Estado en general (scraper_convocatoriasdetrabajo.py):
+  // mismas reglas de vigencia que las ONPE (se mantienen hasta su fecha límite).
+  { archivo: 'convocatoriasdetrabajo.xlsx', _origen: 'Convocatorias' },
   // Cursos Capacita-T (MTPE): se muestran en su propia sección (#cursos),
   // NO aplican la regla de 10 días (los cursos no caducan).
   { archivo: 'cursos.xlsx', _origen: 'Capacita' },
@@ -22,8 +25,8 @@ Promise.all(FUENTES.map(f =>
       const hoja = libro.Sheets[libro.SheetNames[0]];
       return (XLSX.utils.sheet_to_json(hoja, { defval: '' }))
         .filter(esOfertaVisible)
-        .filter(o => esCurso(o) || esReciente(o))   // solo las ofertas/convocatorias caducan
-        .map(o => Object.assign(o, { _origen: f._origen }));
+        .map(o => Object.assign(o, { _origen: f._origen })) // _origen ANTES del filtro: esReciente lo usa
+        .filter(o => esCurso(o) || esReciente(o));          // solo las ofertas/convocatorias caducan
     })
     .catch(() => [])
 ))
@@ -65,9 +68,10 @@ function serieFecha(v) {
   return String(v).trim();
 }
 
-// Una oferta "Con enlace" es la que mantiene algún botón web (PDF o postulación).
+// Una oferta "Con enlace" es la que mantiene algún botón web (PDF de funciones,
+// postulación o el enlace directo de las convocatorias del Estado).
 function esEnlazada(o) {
-  return !!(o.funciones || o.postular);
+  return !!(o.funciones || o.postular || (o._origen === 'Convocatorias' && o.enlace));
 }
 
 // Días calendario entre la fecha de subida y HOY (medianoche local en ambas).
@@ -80,9 +84,22 @@ function diasDesdeHoy(iso) {
   return Math.round((hoy - f) / 86400000);
 }
 
-// Anuncios con más de 10 días de antigüedad no se publican (regla del usuario).
+// Regla de vigencia (2026-09-25):
+//   - FOTOS: 10 días desde la subida (columna `fecha`).
+//   - CONVOCATORIAS ONPE y del Estado (Portaltrabajo / Convocatorias): se
+//     mantienen hasta su fecha LÍMITE (columna `vigencia`). Si no traen fecha
+//     ("hasta completar vacantes") se quedan mientras el scraping las publique.
 const DIAS_MAX = 10;
 function esReciente(o) {
+  if (o._origen === 'Portaltrabajo' || o._origen === 'Convocatorias') {
+    const iso = serieFecha(o.vigencia);
+    if (!iso) return true;
+    const f = new Date(iso + 'T00:00:00');
+    if (isNaN(f)) return true;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return f >= hoy;
+  }
   const iso = serieFecha(o.fecha);
   if (!iso) return false;
   const dias = diasDesdeHoy(iso);
@@ -193,6 +210,99 @@ function tituloRegion(r) {
   return r.split(' ').map(w => (w === 'de' ? w : w[0].toUpperCase() + w.slice(1))).join(' ');
 }
 
+// ---------- Foto ilustrativa según el puesto ----------
+// La carpeta fotos/ guarda imágenes genéricas (Unsplash, libres de regalías).
+// Cada rubro tiene 4 fotos (archivo base + -2/-3/-4): cada tarjeta de trabajo
+// muestra la foto del RUBRO del puesto (cocinero -> cocina, minero -> mina...)
+// elegida AL AZAR entre las 4 para que no se repitan seguidas. Las claves se
+// buscan DESDE EL INICIO de una palabra en el título + descripción: así
+// "inventario" no activa la clave "venta" (no empieza palabra), pero
+// "telecomunicaciones" sí activa "telecomunica" y "oficiales" activa "oficial".
+// Manda el primer rubro que coincide.
+const FOTOS_RUBROS = [
+  { rubro: 'cocina', claves: ['cocina', 'cocinero', 'cocinera', 'chef', 'pasteleria', 'pastelero', 'vajillero', 'vajillera', 'ayudante de cocina', 'ayuda de cocina'] },
+  { rubro: 'restaurante', claves: ['mozo', 'moza', 'mesero', 'mesera', 'restaurante', 'chifa', 'discobar', 'barra', 'concesionaria de alimentos', 'concesionario de alimentos', 'camarero', 'tragos', 'salonero', 'bartender'] },
+  { rubro: 'hotel', claves: ['hotel', 'hosteria', 'habitaciones', 'recojo de habitaciones'] },
+  { rubro: 'telecom', claves: ['telecomunica', 'celular', 'celulares', 'laptop', 'laptops', 'computo', 'computadora', 'lan center', 'telefonia', 'cibersala'] },
+  { rubro: 'salud', claves: ['dental', 'odontolog', 'clinica', 'enfermera', 'farmacia', 'asistente dental', 'laboratorio clinico', 'medico', 'doctor', 'fisioterapia', 'rehabilitacion'] },
+  { rubro: 'tienda', claves: ['tienda', 'vendedor', 'venta', 'atencion al cliente', 'atencion al publico', 'minimarket', 'ceramica', 'libreria', 'perfumeria', 'optica', 'bazar', 'ferreteria', 'abarrotes', 'repuestos', 'distribuidora', 'encomienda', 'cajera', 'promotor', 'cobrador', 'negocio', 'store', 'market'] },
+  { rubro: 'limpieza', claves: ['limpieza', 'lavanderia', 'domestico', 'casa particular', 'ninera', 'nana', 'ninos', 'ama de casa', 'limpiador', 'planchado'] },
+  { rubro: 'mina', claves: ['mina', 'minero', 'minera', 'perforista', 'volquete', 'retroexcavadora', 'cisterna', 'lampero', 'maquinaria pesada', 'unidad minera', 'operario minero', 'operador minero', 'tajo', 'antapaccay', 'tintaya', 'ccapmarca', 'chilloroya', 'colquemarca', 'uchucarco', 'movimiento de tierras', 'socavon', 'subterraneo', 'concentrad'] },
+  { rubro: 'construccion', claves: ['construccion', 'constructor', 'oficial', 'encofrador', 'fierrero', 'albanil', 'carpintero', 'pintor', 'soldador', 'obrero', 'vidrieria', 'vidrio', 'maestro de obra', 'montador', 'estructura metalica', 'ayudante de construccion'] },
+  { rubro: 'moto', claves: ['moto', 'motocicleta', 'delivery', 'mensajero', 'mensajeria'] },
+  { rubro: 'chofer', claves: ['chofer', 'conductor', 'camioneta', 'semitrailer', 'transporte de personal', 'transportista', 'camion', 'furgon', 'operador de camioneta'] },
+  { rubro: 'mecanico', claves: ['mecanico', 'mecanica', 'automotriz', 'taller', 'lubricadora', 'llantas', 'motor', 'frenos', 'torno', 'soldadura', 'servicio tecnico de'] },
+  { rubro: 'almacen', claves: ['almacen', 'almacenero', 'deposito', 'inventario', 'stocker', 'despacho', 'carga y descarga', 'muelle', 'picking'] },
+  { rubro: 'oficina', claves: ['practicante', 'secretaria', 'contador', 'administrador', 'administrativo', 'oficina', 'logistica', 'jefe', 'gerente', 'recursos humanos', 'recepcionista', 'digitador', 'asistente contable'] },
+  // HSE / seguridad industrial: los supervisores de seguridad van con casco y
+  // chaleco, así que usan las fotos de operarios/construcción.
+  { rubro: 'construccion', claves: ['seguridad', 'hse', 'ssoma', 'vigilante', 'guardia', 'supervisor de seguridad', 'prevencionista'] },
+];
+const FOTOS_ARCHIVOS = {
+  cocina: ['cocina.jpg', 'cocina-2.jpg', 'cocina-3.jpg', 'cocina-4.jpg'],
+  restaurante: ['restaurante.jpg', 'restaurante-2.jpg', 'restaurante-3.jpg', 'restaurante-4.jpg'],
+  hotel: ['hotel.jpg', 'hotel-2.jpg', 'hotel-3.jpg', 'hotel-4.jpg'],
+  telecom: ['telecom.jpg', 'telecom-2.jpg', 'telecom-3.jpg', 'telecom-4.jpg'],
+  salud: ['salud.jpg', 'salud-2.jpg', 'salud-3.jpg', 'salud-4.jpg'],
+  tienda: ['tienda.jpg', 'tienda-2.jpg', 'tienda-3.jpg', 'tienda-4.jpg'],
+  limpieza: ['limpieza.jpg', 'limpieza-2.jpg', 'limpieza-3.jpg', 'limpieza-4.jpg'],
+  mina: ['mina.jpg', 'mina-2.jpg', 'mina-3.jpg', 'mina-4.jpg'],
+  construccion: ['construccion.jpg', 'construccion-2.jpg', 'construccion-3.jpg', 'construccion-4.jpg'],
+  moto: ['moto.jpg', 'moto-2.jpg', 'moto-3.jpg', 'moto-4.jpg'],
+  chofer: ['chofer.jpg', 'chofer-2.jpg', 'chofer-3.jpg', 'chofer-4.jpg'],
+  mecanico: ['mecanico.jpg', 'mecanico-2.jpg', 'mecanico-3.jpg', 'mecanico-4.jpg'],
+  almacen: ['almacen.jpg', 'almacen-2.jpg', 'almacen-3.jpg', 'almacen-4.jpg'],
+  oficina: ['oficina.jpg', 'oficina-2.jpg', 'oficina-3.jpg', 'oficina-4.jpg'],
+  // Convocatorias por scraping (ONPE / portaltrabajos.pe): fotos propias de
+  // elecciones/votación para que no se mezclen con la genérica de trabajos.
+  onpe: ['onpe.jpg', 'onpe-2.jpg', 'onpe-3.jpg', 'onpe-4.jpg'],
+};
+const FOTO_GENERICA = 'trabajo.jpg';
+// Evita repetir la foto inmediatamente anterior por rubro (las tarjetas de una
+// misma pantalla se ven con fotos distintas, no se sigue la misma una tras otra).
+const FOTO_ULTIMA = {};
+function fotoRubro(o) {
+  const texto = normalizar((o.titulo || '') + ' ' + (o.descripcion || ''));
+  if (o._origen === 'Portaltrabajo') return 'fotos/' + fotoAzar('onpe');
+  for (const { rubro, claves } of FOTOS_RUBROS) {
+    for (const kw of claves) {
+      const re = new RegExp('\\b' + normalizar(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      if (re.test(texto)) return 'fotos/' + fotoAzar(rubro);
+    }
+  }
+  return 'fotos/' + FOTO_GENERICA;
+}
+function fotoAzar(rubro) {
+  const archivos = FOTOS_ARCHIVOS[rubro];
+  if (!archivos || archivos.length === 1) return (archivos ? archivos[0] : FOTO_GENERICA);
+  let i = Math.floor(Math.random() * archivos.length);
+  if (i === FOTO_ULTIMA[rubro]) i = (i + 1) % archivos.length;
+  FOTO_ULTIMA[rubro] = i;
+  return archivos[i];
+}
+
+// Foto ilustrativa de los CURSOS según la INSTITUCIÓN que los emite
+// (columna `segmento`): cada segmento tiene 4 fotos (mtpe.jpg + mtpe-2/-3/-4,
+// cisco.*, huawei.*, romero.*, bcp.*). Igual que en los trabajos, se elige al
+// azar sin repetir la inmediatamente anterior. Si el segmento es desconocido
+// se usa la genérica de trabajos.
+const FOTOS_ARCHIVOS_SEGMENTOS = {
+  'MTPE': ['mtpe.jpg', 'mtpe-2.jpg', 'mtpe-3.jpg', 'mtpe-4.jpg'],
+  'Cisco': ['cisco.jpg', 'cisco-2.jpg', 'cisco-3.jpg', 'cisco-4.jpg'],
+  'Huawei': ['huawei.jpg', 'huawei-2.jpg', 'huawei-3.jpg', 'huawei-4.jpg'],
+  'Fundación Romero': ['romero.jpg', 'romero-2.jpg', 'romero-3.jpg', 'romero-4.jpg'],
+  'ABC del BCP': ['bcp.jpg', 'bcp-2.jpg', 'bcp-3.jpg', 'bcp-4.jpg'],
+};
+const FOTO_ULTIMA_SEG = {};
+function fotoSegmento(seg) {
+  const archivos = FOTOS_ARCHIVOS_SEGMENTOS[seg];
+  if (!archivos || archivos.length === 1) return 'fotos/' + (archivos ? archivos[0] : FOTO_GENERICA);
+  let i = Math.floor(Math.random() * archivos.length);
+  if (i === FOTO_ULTIMA_SEG[seg]) i = (i + 1) % archivos.length;
+  FOTO_ULTIMA_SEG[seg] = i;
+  return 'fotos/' + archivos[i];
+}
+
 function renderizar(ofertas) {
   const zonas = [...new Set(ofertas.map(regionDe).filter(Boolean))];
   document.getElementById('bannerResumen').textContent =
@@ -210,27 +320,32 @@ function renderizar(ofertas) {
   renderGrid(ofertas);
 }
 
-// ---------- Filtro superior por ORIGEN (Foto / Portaltrabajo) ----------
-// Equivalente al filtro de instituciones de los cursos: botones de color ARRIBA
-// de la lista de trabajos para que el visitante elija su fuente sin bajar.
+// ---------- Filtro por INSTITUCIÓN (columna `empresa`) ----------
+// Select desplegable arriba de la lista (no se muestra todo como botones):
+// "Todas las instituciones" + cada institución con su contador. Al elegir una,
+// solo se ven sus convocatorias.
 function renderFiltroOrigen(ofertas) {
   const cont = document.getElementById('filtroOrigen');
   if (!cont) return;
-  const foto = ofertas.filter(o => o._origen === 'Foto').length;
-  const portal = ofertas.filter(o => o._origen === 'Portaltrabajo').length;
-  const boton = (orig, nombre, n, cls, color, activa) =>
-    `<button class="segfiltro ${cls}${activa ? ' activa' : ''}" data-segfiltro="${orig}">` +
-    `<span class="punto" style="background:${color}"></span>${nombre}<span class="n">${n}</span></button>`;
+  const conteo = {};
+  const etiquetas = {};
+  ofertas.forEach(o => {
+    const ins = normalizar(o.empresa || '');
+    if (!ins) return;
+    conteo[ins] = (conteo[ins] || 0) + 1;
+    etiquetas[ins] = etiquetas[ins] || String(o.empresa).trim();
+  });
+  const lista = Object.entries(conteo)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const opcion = (ins, nombre, n) =>
+    `<option value="${e(ins)}">${e(nombre)} (${n})</option>`;
   cont.innerHTML =
-    boton('', 'Todos', ofertas.length, 'segf-todos',
-      'linear-gradient(120deg,var(--naranja),var(--aubergine))', true) +
-    boton('Foto', 'Fotos', foto, 'segf-foto', 'var(--naranja)', false) +
-    boton('Portaltrabajo', 'Portaltrabajo (ONPE)', portal, 'segf-portal', '#7c3aed', false);
-  cont.querySelectorAll('.segfiltro').forEach(b => b.addEventListener('click', () => {
-    cont.querySelectorAll('.segfiltro').forEach(x => x.classList.remove('activa'));
-    b.classList.add('activa');
-    filtrar();
-  }));
+    `<label class="lbl-inst" for="filtroSelInstitucion">Institución</label>` +
+    `<select id="filtroSelInstitucion" class="select-institucion">` +
+    opcion('', 'Todas las instituciones', ofertas.length) +
+    lista.map(([ins, n]) => opcion(ins, etiquetas[ins], n)).join('') +
+    `</select>`;
+  document.getElementById('filtroSelInstitucion').addEventListener('change', filtrar);
 }
 
 // Ofertas destacadas = los 3 trabajos MÁS RECIENTES (últimos subidos), resaltados
@@ -255,6 +370,7 @@ function crearTarjetaDestacada(o, i) {
   const meta = [o.empresa, o.ubicacion].filter(Boolean).map(e).join(' · ');
   return `
     <article class="destacado-tarjeta">
+      <img class="tarjeta-foto" src="${fotoRubro(o)}" alt="${e(o.titulo)}" loading="lazy">
       <div class="dest-top">
         <span class="desta-rango">${i + 1}<i>º</i></span>
         <div class="categoria">${tipos.join('')}${chipFecha}</div>
@@ -264,7 +380,7 @@ function crearTarjetaDestacada(o, i) {
       ${meta ? `<p class="meta">${meta}</p>` : ''}
       ${o.descripcion ? `<p class="entradilla">${e(o.descripcion)}</p>` : ''}
       ${o.sueldo ? `<span class="sueldo">${e(o.sueldo)}</span>` : ''}
-      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonWhatsapp(o)}</div>
+      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonWhatsapp(o)}</div>
     </article>`;
 }
 
@@ -311,13 +427,14 @@ function crearTarjeta(o) {
   const meta = [o.empresa, o.ubicacion].filter(Boolean).map(e).join(' · ');
   const texto = normalizar(o.titulo + ' ' + o.empresa + ' ' + o.ubicacion + ' ' + o.descripcion);
   return `
-    <article class="tarjeta" data-tipo="${tipoDe(o)}" data-zona="${e(regionDe(o))}" data-origen="${e(o._origen || '')}" data-texto="${e(texto)}">
+    <article class="tarjeta" data-tipo="${tipoDe(o)}" data-zona="${e(regionDe(o))}" data-origen="${e(o._origen || '')}" data-institucion="${e(normalizar(o.empresa || ''))}" data-texto="${e(texto)}">
+      <img class="tarjeta-foto" src="${fotoRubro(o)}" alt="${e(o.titulo)}" loading="lazy">
       ${tipos.join('') || etiquetaFecha ? `<div class="categoria">${tipos.join('')}${etiquetaFecha}</div>` : ''}
       <h3 class="titulo">${e(o.titulo)}</h3>
       ${meta ? `<p class="meta">${meta}</p>` : ''}
       ${o.descripcion ? `<p class="descripcion">${e(o.descripcion)}</p>` : ''}
       ${o.sueldo ? `<span class="sueldo">${e(o.sueldo)}</span>` : ''}
-      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonWhatsapp(o)}</div>
+      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonWhatsapp(o)}</div>
     </article>`;
 }
 
@@ -440,6 +557,7 @@ function crearTarjetaCurso(o) {
   const texto = normalizar(o.titulo + ' ' + o.segmento + ' ' + o.empresa + ' ' + o.ubicacion + ' ' + o.descripcion);
   return `
     <article class="tarjeta tarjeta-curso" data-tipo="curso" data-zona="${e(o.ubicacion)}" data-texto="${e(texto)}" data-segmento="${e(o.segmento || '')}">
+      <img class="tarjeta-foto" src="${fotoSegmento(o.segmento || 'Otro')}" alt="${e(o.titulo)}" loading="lazy">
       <div class="categoria">${badge || '<span class="tipo">Curso</span>'}</div>
       <h3 class="titulo">${e(o.titulo)}</h3>
       ${meta ? `<p class="meta">${meta}</p>` : ''}
@@ -482,6 +600,13 @@ function botonPostular(o) {
     : '';
 }
 
+// Enlace directo a la convocatoria del Estado (fuente "Convocatorias").
+function botonConvocatoria(o) {
+  return (o._origen === 'Convocatorias' && o.enlace)
+    ? `<a class="boton boton-convocatoria" href="${e(o.enlace)}" target="_blank" rel="noopener">VER CONVOCATORIA</a>`
+    : '';
+}
+
 function botonWhatsapp(o) {
   if (!o.whatsapp) return '';
   const n = String(o.whatsapp).replace(/\D/g, '');
@@ -490,10 +615,19 @@ function botonWhatsapp(o) {
     `<a class="boton boton-whatsapp" href="https://wa.me/51${n}?text=${m}" target="_blank" rel="noopener">WHATSAPP</a>`;
 }
 
-// Chip de fecha de SUBIDA: referencia visible de cuándo se publicó la oferta.
-// La fecha es la del día en que se subió la foto/anuncio (columna `fecha`).
-// Al apuntar con el mouse muestra la fecha exacta.
+// Chip de fecha: en las FOTOS muestra el día de SUBIDA; en las convocatorias
+// (ONPE y del Estado) muestra la fecha LÍMITE ("Hasta el d mmm"). Al apuntar
+// con el mouse muestra la fecha exacta.
 function fechaChip(o, compacto) {
+  if (o._origen === 'Portaltrabajo' || o._origen === 'Convocatorias') {
+    const iso = serieFecha(o.vigencia);
+    if (!iso) return '';
+    const f = new Date(iso + 'T00:00:00');
+    if (isNaN(f)) return '';
+    const exacta = f.toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
+    const corta = f.toLocaleDateString('es-PE', { day: 'numeric', month: 'short' });
+    return `<span class="tipo tipo-fecha" title="Vence el ${e(exacta)}"><span class="pt"></span>Hasta el ${e(corta)}</span>`;
+  }
   const iso = serieFecha(o.fecha);
   if (!iso) return '';
   const f = new Date(iso);
@@ -560,16 +694,17 @@ function filtrar() {
   const busca = document.getElementById('buscador').value;
   const tipo = (document.querySelector('.filtro.activo') || {}).dataset.filtro || 'todo';
   const zona = (document.querySelector('.chip.activa') || { dataset: { zona: '' } }).dataset.zona || '';
-  const origen = ((document.querySelector('#filtroOrigen .segfiltro.activa') || {}).dataset || {}).segfiltro || '';
+  const selInst = document.getElementById('filtroSelInstitucion');
+  const institucion = selInst ? selInst.value : '';
 
   let visibles = 0;
   tarjetas.forEach(t => {
     const d = t.dataset;
     const tipoOk = tipo === 'todo' || (d.tipo || '').indexOf(tipo) !== -1;
     const zonaOk = zona === '' || d.zona === zona;
-    const origenOk = origen === '' || d.origen === origen;
+    const instOk = institucion === '' || d.institucion === institucion;
     const textoOk = coincide(d.texto || '', busca);
-    const muestra = tipoOk && zonaOk && origenOk && textoOk;
+    const muestra = tipoOk && zonaOk && instOk && textoOk;
     t.classList.toggle('oculto', !muestra);
     if (muestra) visibles++;
   });

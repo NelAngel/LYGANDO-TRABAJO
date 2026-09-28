@@ -23,22 +23,24 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-# Purga automática de anuncios viejos (regla de 10 días): se ejecuta al guardar.
-from purgar import DIAS_MAX, purgar
+# Purga automática: las fotos se purgan por antigüedad (10 días), las convocatorias
+# por su FECHA LÍMITE (columna `vigencia`); se ejecuta al guardar.
+from purgar import purgar_por_vigencia
 
 FEED_URL = "https://www.portaltrabajos.pe/feeds/posts/default/-/ONPE"
 OUT_XLSX = "convocatorias.xlsx"
 OUT_JSON = "convocatorias_onpe.json"
 EMPRESA = "ONPE"
 FUENTE = "Portaltrabajo - ONPE"
-# 12 columnas originales + 4 enlaces clave que vienen en cada entrada del feed:
+# 12 columnas originales + 5 extra de scraping:
 #   ver_detalles : PDF "[ VER MÁS DETALLES ]"   (bases / requisitos completos)
 #   funciones    : PDF "[ FUNCIONES ]"
 #   guia_registro: PDF "[ VER GUÍA DE REGISTRO ]"
 #   postular     : enlace al sistema de ONPE "[ POSTULAR ]"
+#   vigencia     : fecha LÍMITE de postulación (ISO) o '' si es "hasta completar vacantes"
 COLUMNAS = ["id", "titulo", "empresa", "ubicacion", "sueldo", "descripcion",
             "enlace", "whatsapp", "fecha", "fuente", "destacado", "visible",
-            "ver_detalles", "funciones", "guia_registro", "postular"]
+            "ver_detalles", "funciones", "guia_registro", "postular", "vigencia"]
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 "
@@ -81,6 +83,22 @@ def extraer_campo(texto, clave):
 def limpiar_ubicacion(txt):
     """'Nivel Nacional - (Según ODPE Disponible)' -> 'Nivel Nacional'."""
     return re.sub(r"\s*[-]\s*\(\s*[Ss]eg[uú]n\s+ODPE[^)]*\)|\s*\(\s*[Ss]eg[uú]n\s+ODPE[^)]*\)", "", txt).strip()
+
+
+def extraer_vigencia(texto):
+    """Fecha LÍMITE de postulación de la convocatoria (columna `vigencia`).
+    'Vigente: Hasta el 27/09/2026' -> '2026-09-27'. Vuelve '' si no hay fecha
+    concreta ('Hasta completar vacantes, según ODPE'): esas se mantienen
+    mientras el sitio las siga publicando (se controlan con el scraping)."""
+    m = re.search(r"\bVigente\s*[:\-]\s*Hasta\s+el\s+(\d{1,2})/(\d{1,2})/(\d{4})",
+                  texto, re.IGNORECASE)
+    if not m:
+        return ""
+    d, mm, a = m.groups()
+    try:
+        return datetime(int(a), int(mm), int(d)).date().isoformat()
+    except ValueError:
+        return ""
 
 
 # Enlaces que interesan de cada entrada y a qué columna van.
@@ -134,6 +152,7 @@ def convertir(entradas):
             "fecha": publicado[:10],
             "fuente": FUENTE,
             "destacado": "no",
+            "vigencia": extraer_vigencia(contenido),
             # Regla de oro: sin LUGAR no se publica (queda en el Excel, oculta)
             "visible": "si" if ubicacion else "no",
         }
@@ -190,7 +209,7 @@ def guardar_xlsx(filas):
         for j, nombre in enumerate(COLUMNAS, 1):
             ws.cell(row=i, column=j, value=fila.get(nombre, ""))
 
-    anchos = [6, 52, 12, 22, 24, 70, 70, 12, 12, 24, 10, 8, 48, 48, 48, 42]
+    anchos = [6, 52, 12, 22, 24, 70, 70, 12, 12, 24, 10, 8, 48, 48, 48, 42, 12]
     for j, ancho in enumerate(anchos, 1):
         ws.column_dimensions[get_column_letter(j)].width = ancho
     ws.freeze_panes = "A2"
@@ -255,10 +274,12 @@ def main():
         }, f, ensure_ascii=False, indent=2)
     print(f"[ok] JSON guardado: {OUT_JSON}")
 
-    # Purga automática (regla de 10 días): deja solo las convocatorias recientes.
-    borradas = purgar(OUT_XLSX)
-    print(f"[ok] Purga automática: {borradas} convocatorias antiguas eliminadas"
-          f" (solo quedan las de {DIAS_MAX} días).")
+    # Purga automática por VIGENCIA: borra las convocatorias cuya fecha límite ya
+    # pasó. Las "hasta completar vacantes" (sin fecha) se quedan: el scraping de
+    # cada 2-3 días decide si siguen vigentes (si el sitio las deja de publicar,
+    # dejan de aparecer en el feed y se van solas).
+    borradas = purgar_por_vigencia(OUT_XLSX)
+    print(f"[ok] Purga automática: {borradas} convocatorias con vigencia pasada eliminadas.")
 
 
 if __name__ == "__main__":

@@ -3,14 +3,17 @@
 ## Qué es esto
 Página web pública de ofertas de empleo del Perú: `index.html` (HTML puro, CSS integrado),
 leída en el navegador con **Live Server de Visual Studio Code**. NADA de PHP, MySQL ni phpMyAdmin.
-Base de datos = DOS Excels leídos con SheetJS (`xlsx.full.min.js` local):
+Base de datos = DOS+Tres Excels leídos con SheetJS (`xlsx.full.min.js` local):
 
-- **`ofertas.xlsx`**       -> anuncios de FOTOS (manual, con OCR).
-- **`convocatorias.xlsx`**  -> convocatorias por SCRAPING (ONPE), generado por `scraper_onpe.py`.
+- **`ofertas.xlsx`**                     -> anuncios de FOTOS (manual, con OCR).
+- **`convocatorias.xlsx`**               -> convocatorias ONPE por SCRAPING, generado por `scraper_onpe.py`.
+- **`convocatoriasdetrabajo.xlsx`**      -> convocatorias del Estado en general (CAS/728/276/
+  prácticas de cualquier institución) por SCRAPING de `www.convocatoriasdetrabajo.com`,
+  generado por `scraper_convocatoriasdetrabajo.py`.
 
-`script.js` carga ambos (`FUENTES = ['ofertas.xlsx','convocatorias.xlsx']`), fusiona,
-ordena por `fecha` desc y marca cada tarjeta con etiqueta "Foto" u "Portaltrabajo".
-Si falta un Excel, se salta sin romper la página.
+`script.js` carga todos (`FUENTES = ['ofertas.xlsx','convocatorias.xlsx',
+'convocatoriasdetrabajo.xlsx', ...]`), fusiona, ordena por `fecha` desc y marca cada
+tarjeta con su etiqueta de origen. Si falta un Excel, se salta sin romper la página.
 
 Características de la página: banner "+N ofertas en M regiones del Perú", estadísticas
 (total / con enlace / con whatsapp / regiones), oferta destacada (`destacado=si`, o la más
@@ -29,22 +32,37 @@ Si en un anuncio falta alguno: **NO INVENTAR NADA** -> dejo el campo vacío, avi
 usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
 (se marca `visible=no` y queda en el Excel).
 
-## REGLA DE VIGENCIA (10 DÍAS) — decidida por el usuario 2026-09-15
-- `script.js` NO los muestra (filtro `esReciente()`, `DIAS_MAX = 10`).
-- `purgar.py` los BORRA de los Excels: `python3 purgar.py` (usa columna `fecha`). Aplica a
-  AMBAS fuentes (fotos y scraping).
+## REGLA DE VIGENCIA — decidida por el usuario 2026-09-15 (criterio ONPE añadido 2026-09-25)
+- **FOTOS (`ofertas.xlsx`): 10 días desde la subida**. `script.js` NO los muestra
+  (filtro `esReciente()`, `DIAS_MAX = 10`). `purgar.py` los BORRA del Excel:
+  `python3 purgar.py` (usa columna `fecha`).
 - **La fecha de subida manda (decidido por el usuario 2026-09-17)**: los 10 días se cuentan
   DESDE la fecha en que se sube la imagen (columna `fecha` = día de subida, no el día del
   cartel). Si hoy se suben 20 fotos, todas llevan `fecha` = fecha de HOY. Al registrar cada
   foto nueva en `ofertas.xlsx` SIEMPRE completar `fecha` con el día de subida (hoy).
-- **Cada tarjeta muestra su fecha de subida** (2026-09-17): chip ámbar "Subido hoy / ayer /
-  hace N días / Subido el d mmm" en la fila de etiquetas de TODAS las tarjetas de trabajo
-  (botones `fechaChip()` y `fechaSubida()` en `script.js`; tooltip con la fecha exacta).
-  Los cursos NO lo llevan (no caducan, no nacen de una subida).
-- **PURGA AUTOMÁTICA**: `scraper_onpe.py` ya importa `purgar` y ejecuta la purga SOLO al
-  terminar de guardar `convocatorias.xlsx` (no toca `ofertas.xlsx`). El usuario YA NO tiene
-  que correr `purgar.py` manualmente después de cada scraping: ocurre solo.
-  `ofertas.xlsx` (fotos) sigue purgándose con `python3 purgar.py` cuando el usuario quiera.
+- **CONVOCATORIAS ONPE (`convocatorias.xlsx`): se mantienen hasta su fecha LÍMITE**
+  (decisión del usuario 2026-09-25). La regla de 10 días NO aplica a las convocatorias:
+  - El scraper extrae la columna **`vigencia`** (ISO) parseando "Vigente: Hasta el
+    DD/MM/YYYY" del contenido del feed (`extraer_vigencia()`). Vacía si la convocatoria
+    dice "Hasta completar vacantes, según ODPE" (sin fecha concreta).
+  - `script.js` (`esReciente()`): convocatoria con `vigencia` >= hoy sigue VISIBLE; con
+    `vigencia` YA PASADA se oculta; SIN `vigencia` se queda mientras el scraping siga
+    publicándola (re-correr `scraper_onpe.py` cada 2-3 días: lo que el feed deje de
+    traer desaparece solo). NO pasan por `DIAS_MAX`.
+  - **Chip de la tarjeta ONPE** (2026-09-25): en vez de la fecha de subida muestra
+    "**Hasta el d mmm**" (fecha límite; tooltip "Vence el ..."). Sin `vigencia` -> sin chip.
+  - **PURGA AUTOMÁTICA**: `scraper_onpe.py` llama a `purgar_por_vigencia()` SOLO al
+    terminar de guardar `convocatorias.xlsx` (borra filas con vigencia ya pasada; no toca
+    `ofertas.xlsx` ni las sin fecha). El usuario YA NO tiene que correr `purgar.py`
+    manualmente después de cada scraping: ocurre solo.
+- **CONVOCATORIAS DEL ESTADO (`convocatoriasdetrabajo.xlsx`): se tratan IGUAL que las
+  ONPE** (decisión del usuario 2026-09-25): se mantienen hasta su fecha LÍMITE (columna
+  `vigencia`), nunca pasan por `DIAS_MAX`, y `script.js` (ramas de `esReciente()` y
+  `fechaChip()` para `_origen === 'Convocatorias'`) las oculta y muestra igual: chip
+  "**Hasta el d mmm**" y botón **VER CONVOCATORIA** (enlace a la convocatoria original).
+- **`purgar.py` hace cada regla en su archivo**: `purgar()` (10 días) para `ofertas.xlsx`
+  y `purgar_por_vigencia()` para `convocatorias.xlsx` y `convocatoriasdetrabajo.xlsx`.
+  `python3 purgar.py` limpia TODOS con su regla correspondiente.
 
 ## CURSOS GRATUITOS Capacita-T (MTPE) — 3ª fuente (decidida por el usuario 2026-09-15)
 - **Origen**: `scraper_capacita.py` (scraping a `capacitacionlaboral.trabajo.gob.pe/cursos/`;
@@ -63,10 +81,10 @@ usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
   BCP) van en una barra ARRIBA de la lista de cursos (no en talón lateral); al pulsar uno
   la lista muestra SOLO ese segmento (combina con `buscadorCursos`). En móvil (≤900px) la
   barra se corre en horizontal.
-- **FILTRO SUPERIOR por origen en TRABAJOS** (decisión del usuario 2026-09-17): igual que
-  los cursos, la sección de ofertas lleva arriba botones de color "Todos / Fotos /
-  Portaltrabajo (ONPE)" con su contador (`#filtroOrigen`). Combina con TODAS/CON ENLACE/
-  CON WHATSAPP/CON LLAMADA, los chips de región y el buscador.
+- **FILTRO SUPERIOR por institución en TRABAJOS** (2026-09-25): `#filtroOrigen` ya NO es
+  por origen (Fotos/Portaltrabajo/Convocatorias, quitado). Es un **select desplegable**
+  con el nombre de las instituciones (columna `empresa`, cada una con su contador).
+  Combina con TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA, los chips de región y el buscador.
 - **Columnas mostradas**: col `duracion` (ej. "8 horas"), `certifica` (si/no) y DOBLE botón:
   EMPEZAR CURSO (`empezar_curso` = plataforma LMS del curso) + VER RUTA (`ver_ruta` =
   ruta formativa). La tarjeta NO lleva LLAMAR/WHATSAPP (los cursos no tienen contacto).
@@ -169,6 +187,44 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
 - Ubicaciones "Nivel Nacional - (Según ODPE Disponible)" -> "Nivel Nacional".
 - Genera además `convocatorias_onpe.json` (respaldo).
 
+## Scraping del Estado (convocatoriasdetrabajo.xlsx) — 2026-09-25
+- **Origen**: `scraper_convocatoriasdetrabajo.py` (requests + bs4 + openpyxl; sin pandas,
+  porque no está instalado). Scrapea `www.convocatoriasdetrabajo.com` (empleos del Estado:
+  CAS, 728, 276, prácticas, etc. de cualquier institución). Uso:
+  - `python3 scraper_convocatoriasdetrabajo.py`        -> TODAS las vigentes de la portada.
+  - `--max N` -> limita los detalles a N (solo pruebas).
+- **Detecta SOLO la lista de la PORTADA**: los bloques con "Vigente hasta el DD/MM/AAAA"
+  (`extraer_activas()`); se deduplican y se salta el detalle de las que ya pasaron en el
+  propio listado. La portada publica ~266 vigentes (una tarea periódica de 2-3 días la
+  mantiene sola: lo que deje de estar "Vigente hasta" desaparece). Por defecto NO hay tope
+  (decisión del usuario 2026-09-25: quería ver TODAS las vigentes, no solo 150).
+- OJO: el sitio muestra un total de "3000+" empleos porque cuenta CADA PUESTO por separado
+  (`oportunidad-laboral-...html`, uno por código CAS/item, incluye muchos finalizadas).
+  Las CONVOCATORIAS vigentes son los `oferta-de-empleo-...html` de la portada (~266), que
+  son los que captura este scraper (una tarjeta por convocatoria).
+- **Una tarjeta por convocatoria** (decisión del usuario 2026-09-25), no por puesto: filas
+  con las MISMAS 17 columnas que `convocatorias.xlsx` (`id, titulo, empresa, ubicacion,
+  sueldo, descripcion, enlace, whatsapp, fecha, fuente, destacado, visible, ver_detalles,
+  funciones, guia_registro, postular, vigencia`).
+- Mapeo de campos del detalle: `empresa`=Institución, `ubicacion`="Lugar de labores"
+  (departamentos reales, ej. "Ica, Lima, Tacna"), `sueldo`=Remuneración, `enlace`=URL
+  original, `fecha`=Fecha de Publicación (ISO), `vigencia`="Vigente hasta el DD/MM/AAAA" o
+  "Finaliza: dd de MMMM del AAAA" (ISO). `descripcion` = resumen (contrato, nivel "Hay
+  puestos para", plazas "Hay plazas para", remuneración, puestos destacados como
+  "CAS N° 015 - ITEM N° 01: MADRE SUSTITUTA").
+- Si `titulo` o `ubicacion` vienen vacíos (páginas compilación sin datos), la fila sale
+  `visible=no`. Las que dicen "CONVOCATORIA FINALIZADA" no se publican.
+- **PURGA AUTOMÁTICA**: al terminar llama a `purgar_por_vigencia()` sobre su propio xlsx
+  (borra las con vigencia ya pasada). `purgar.py` también lo incluye en `purgar_todo()`.
+- Genera respaldo `convocatoriasdetrabajo.json`.
+- En la página: etiqueta **"Convocatorias"** con su botón en el filtro superior
+  (`renderFiltroOrigen`, color #0284c7), **botón VER CONVOCATORIA** (`botonConvocatoria()`,
+  clase `.boton-convocatoria`), chip "Hasta el d mmm" y CON ENLACE cuenta con
+  `esEnlazada()` (enlace de esta fuente ya cuenta como botón web).
+- En `fotoRubro()` las Convocatorias NO pasan por la rama `onpe`: caen en el mapeo por
+  palabras clave de `FOTOS_RUBROS` (foto del rubro del puesto, ej. "médicos"->salud,
+  "conductores"->chofer, "prácticas de oficina"->oficina).
+
 ## Conceptos importantes (lecciones aprendidas — aplicar SIEMPRE)
 - **NUNCA comparar horas sueltas con fechas "solo-día"**: `new Date("2026-09-17")` se
   parsea como MEDIANOCHE UTC (por ser formato ISO de fecha sin hora), mientras que
@@ -180,8 +236,8 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   (`new Date(iso + 'T00:00:00')`) y normaliza "hoy" a medianoche local también
   (`hoy.setHours(0,0,0,0)`); con eso, `Math.round((hoy - f)/86400000)` = 0 para lo
   subido hoy a cualquier hora, 1="ayer", 2..6="hace N días", >=7 fecha larga.
-  `fechaSubida()`, `fechaSubidaCorta()` y `esReciente()` (regla de 10 días) usan
-  `diasDesdeHoy()`. OJO: `Math.round` sobre `Date.now()-fecha` SIN normalizar "hoy" a
+  `fechaSubida()`, `fechaSubidaCorta()` y la rama de FOTOS de `esReciente()` (regla de 10
+  días) usan `diasDesdeHoy()`. OJO: `Math.round` sobre `Date.now()-fecha` SIN normalizar "hoy" a
   medianoche local vuelve a fallar en las tardes/noches.
 - **Anti-duplicados**: ver regla exacta en ANTI-DUPLICADOS. La página solo oculta cuando
   TODO se repite (`claveOferta` = titulo + número + ubicacion + empresa); si cambia algo,
@@ -230,6 +286,57 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   `.destacado-tarjeta .entradilla`, `.como-aplicar p`, `.paso p`, `.piefooter p`,
   `.vacio/.cargando`) van con `text-align: justify` + `hyphens: auto` para que no queden
   desalineados.
+
+## FOTOS ILUSTRATIVAS EN LAS TARJETAS (2026-09-24, pedido del usuario)
+- Cada tarjeta de TRABAJO muestra ARRIBA una foto genérica del RUBRO del puesto
+  (si pide cocinero -> cocina; minero -> mina; venta de tienda -> tienda...). No son las
+  fotos de `images/` (esa carpeta sigue siendo SOLO fuente OCR): son 60 imágenes Unsplash
+  libres de regalías descargadas en la carpeta local **`fotos/`** para que funcionen sin
+  internet (como la fuente Ubuntu con fallback): **4 fotos por rubro** (archivo base
+  `cocina.jpg` + `cocina-2/-3/-4.jpg`, etc.) para que las tarjetas del mismo rubro no
+  repitan siempre la misma imagen.
+- `FOTOS_ARCHIVOS` mapea cada rubro a su lista de 4 archivos; `fotoAzar(rubro)` elige uno
+  AL AZAR evitando repetir la foto inmediatamente anterior del mismo rubro
+  (registro por rubro en `FOTO_ULTIMA`), así dos tarjetas seguidas de cocina muestran
+  fotos distintas. `fotoRubro(o)` devuelve `'fotos/' + fotoAzar(rubro)`.
+- `fotoRubro(o)` en `script.js` elige la foto buscando claves en `titulo + descripcion`
+  DESDE EL INICIO de una palabra (regex `\b`+clave SIN límite final): así "inventario" NO
+  activa la clave "venta" (no está al inicio de palabra), pero "telecomunicaciones"
+  activa "telecomunica" y "oficiales" activa "oficial". Manda el primer rubro que coincide.
+- Mapeo `FOTOS_RUBROS` (orden importa): cocina/cocinero/pasteleria/vajillero->cocina;
+  mozo/mesero/restaurante/chifa/discobar/tragos->restaurante; hotel/habitaciones->hotel
+  (OJO: NO usar clave "hospedaje": un anuncio de mina que dice "cubrimos hospedaje"
+  daría hotel); telecomunica/celular/laptop/lan center->telecom; dental/odontolog/
+  clinica/enfermera->salud; tienda/venta/minimarket/bazar/libreria/perfumeria/optica->
+  tienda; limpieza/lavanderia/ninera/casa particular->limpieza; mina/minero/perforista/
+  antapaccay/tintaya/ccapmarca/retroexcavadora/cisterna/lampero->mina; construccion/
+  oficial/encofrador/fierrero/obrero/vidrieria->construccion; moto/delivery->moto;
+  chofer/conductor/camioneta/semitrailer->chofer; mecanico/automotriz/taller->mecanico;
+  almacen/picking/inventario/despacho->almacen; practicante/oficina/logistica/gerente->
+  oficina; seguridad/hse/ssoma/vigilante->construccion (supervisores de seguridad van
+  con casco); sin coincidencia -> `trabajo.jpg` (genérica, NO tiene -2/-3/-4).
+- **FOTOS PROPIAS PARA LAS CONVOCATORIAS ONPE** (2026-09-25): `fotoRubro()` tiene una
+  rama que antepone el rubro `onpe` cuando `_origen === 'Portaltrabajo'`, así TODAS las
+  convocatorias de portaltrabajos.pe muestran fotos de elecciones/votación (`fotos/onpe.jpg`
+  + `onpe-2/-3/-4.jpg`, elegidas al azar con `fotoAzar('onpe')` sin repetir la anterior)
+  y NUNCA la genérica `trabajo.jpg`. Las 4 vienen de Unsplash (voto en urna, votante en
+  mesa, letrero "polling station", voto por correo).
+- Inyección: `<img class="tarjeta-foto" src="${fotoRubro(o)}" alt="..." loading="lazy">`
+  como PRIMER hijo del `<article>` en `crearTarjeta()` y `crearTarjetaDestacada()`.
+  CSS: alto 150px (165px en la destacada), `object-fit:cover`, `border-radius:17px
+  17px 0 0`, margen negativo para tocar los bordes (`-22px -22px 8px`; la destacada
+  `-22px -20px` porque lleva padding 22/20) y `mask-image` que desvanece la base sobre
+  el naranja de la tarjeta.
+- **FOTOS EN LOS CURSOS por INSTITUCIÓN** (2026-09-24, pedido del usuario): como los
+  trabajos, CADA tarjeta de curso muestra arriba una foto del SEGMENTO/institución que
+  emite el curso (columna `segmento`): MTPE (capacitación/aula), Cisco (redes/servidores),
+  Huawei (IA/circuitos), Fundación Romero (oficina/PC), ABC del BCP (ahorro/dinero).
+  Son 20 imágenes más en `fotos/` (4 por institución: `mtpe.jpg` + `mtpe-2/-3/-4.jpg`,
+  `cisco.*`, `huawei.*`, `romero.*`, `bcp.*`). `FOTOS_ARCHIVOS_SEGMENTOS` mapea segmento ->
+  sus 4 archivos; `fotoSegmento(seg)` elige al azar sin repetir la inmediatamente anterior
+  (registro por segmento en `FOTO_ULTIMA_SEG`), igual que `fotoAzar`. Segmento desconocido
+  ("Otro") cae en la genérica `trabajo.jpg`. Se inyecta como PRIMER hijo del `<article>`
+  en `crearTarjetaCurso()` (misma `.tarjeta-foto`, mismo CSS, sin cambios de style).
 
 ## Estado actual (snapshot 2026-09-18 — 17 imágenes nuevas subidas)
 
@@ -330,9 +437,18 @@ Cocinero/a (Cusco, wa+enlace), Personal de limpieza (Trujillo, wa), Ayudante de 
 
 Omitida: `17.45.40` es "CASA EN VENTA" (no es trabajo). Duplicado: `08.55.18` = `14.54.45` (ya publicada).
 
-SCRAPING en `convocatorias.xlsx`: 4 convocatorias ONPE (después de purgar los >10 días),
-todas visibles. El resto del feed queda en `convocatorias_onpe.json` (respaldo) y vuelve al
-Excel solo al re-correr `scraper_onpe.py` (allí se vuelve a purgar con `purgar.py`).
+SCRAPING en `convocatorias.xlsx` (2026-09-25): 46 convocatorias ONPE (41 "hasta completar
+vacantes" sin fecha límite + 5 con vigencia futura), todas visibles. La purga por vigencia
+borró 104 de la corrida anterior. El resto del feed queda en `convocatorias_onpe.json`
+(respaldo) y vuelve al Excel solo al re-correr `scraper_onpe.py` (allí se vuelve a purgar
+con la regla de vigencia).
+
+SCRAPING en `convocatoriasdetrabajo.xlsx` (2026-09-25): **262 convocatorias del Estado**
+(SIN tope: se procesaron las 267 vigentes de la portada y la purga eliminó 5 que al leer
+el detalle ya habían pasado — quedan 262), todas visibles y con `vigencia` >= hoy. La
+portada del sitio publica ~266 vigentes "Vigente hasta el DD/MM/AAAA"; al re-correr el
+scraper cada 2-3 días las que vencen desaparecen solas. El total "3000+" del sitio
+cuenta por PUESTO (muchos finalizados) y no se usan para no saturar la página.
 
 ## Snapshot CURSOS 2026-09-17 (cambios de este día)
 `scraper_capacita.py` ahora incluye la columna **`segmento`** = entidad que EMITE cada
@@ -344,12 +460,14 @@ Huawei 14, ABC del BCP 1 (todos visibles, ninguno sin segmento). En la página:
 - **Filtro SUPERIOR** por institución en `#segmentosFiltros` (botones `segfiltro` de color
   con contador: Todos/MTPE/Cisco/Huawei/Fundación Romero/ABC del BCP). El usuario pidió que
   NO sea lateral/bajo sino ARRIBA (2026-09-17). En móvil ≤900px la barra corre en horizontal.
-- **Filtro SUPERIOR por origen en TRABAJOS**: `#filtroOrigen` con botones de color
-Todos/Fotos/Portaltrabajo (ONPE) con contador, arriba de la lista de ofertas (pedido
-  por el usuario 2026-09-17). Las tarjetas llevan `data-origen={_origen}` y `filtrar()` combina
-  origen + TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA + chips de región + buscador.
+- **Filtro de instituciones en TRABAJOS**: `#filtroOrigen` es un **select desplegable**
+  (`renderFiltroOrigen`) con "Todas las instituciones" + cada institución (columna
+  `empresa`) con su contador, arriba de la lista de ofertas (2026-09-25, pedido del usuario:
+  ya NO son botones de origen). Las tarjetas llevan `data-institucion={empresa normalizada}`
+  y `filtrar()` combina institución + TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA + chips
+  de región + buscador.
 - Cada filtro consulta su propia barra (`#segmentosFiltros ... .segfiltro.activa` en cursos,
-  `#filtroOrigen ... .segfiltro.activa` en trabajos) para no pisarse entre sí.
+  `#filtroOrigen #filtroSelInstitucion` en trabajos) para no pisarse entre sí.
 - Búsqueda de cursos ahora incluye `o.segmento` en el texto indexado (buscar "huawei" o
   "romero" encuentra esos cursos).
 
@@ -364,8 +482,9 @@ Todos/Fotos/Portaltrabajo (ONPE) con contador, arriba de la lista de ofertas (pe
 - Columnas base de los Excels (13): id, titulo, empresa, ubicacion, sueldo, descripcion,
   enlace, whatsapp, fecha, fuente, destacado, visible, contacto. Hoja llamada "Ofertas".
   `contacto` = `llamada` (botón LLAMAR) o `whatsapp`/vacío (botón WHATSAPP).
-- `convocatorias.xlsx` tiene 4 columnas extra (solo scraping): `ver_detalles`, `funciones`,
-  `guia_registro`, `postular` (links a PDF de Google Drive y al sistema de ONPE).
+- `convocatorias.xlsx` tiene 5 columnas extra (solo scraping): `ver_detalles`, `funciones`,
+  `guia_registro`, `postular` (links a PDF de Google Drive y al sistema de ONPE) y
+  `vigencia` (fecha límite ISO, vacía si es "hasta completar vacantes").
   `script.js` lee por NOMBRE de columna, así que `ofertas.xlsx` (sin extra) sigue funcionando.
 - Botones por tarjeta: FUNCIONES (PDF), POSTULAR (ONPE), WHATSAPP o LLAMAR. La tarjeta ya
   muestra los detalles (título, descripción, sueldo), por eso NO hay botones VER OFERTA ni
@@ -381,9 +500,13 @@ Todos/Fotos/Portaltrabajo (ONPE) con contador, arriba de la lista de ofertas (pe
    **ANTES de registrar una imagen, verificar que NO esté ya publicada** (ver
    ANTI-DUPLICADOS): si la misma foto (aunque cambie el nombre) ya se procesó, no
    registrarla de nuevo.
-2. SCRAPING: `python3 scraper_onpe.py` (regenera `convocatorias.xlsx` + JSON) y AL FINAL
-   purga automáticamente las convocatorias viejas (>10 días). No hace falta correr purga.
-3. PURGAR fotos: `python3 purgar.py` (borra de `ofertas.xlsx` los anuncios con >10 días).
+2. SCRAPING: `python3 scraper_onpe.py` (regenera `convocatorias.xlsx` + JSON) y
+   `python3 scraper_convocatoriasdetrabajo.py` (regenera `convocatoriasdetrabajo.xlsx` +
+   JSON). Ambos purgan automáticamente al final las convocatorias cuya vigencia ya pasó
+   (ver REGLA DE VIGENCIA). Correr cada 2-3 días: las "hasta completar vacantes" y las
+   vigentes se quedan solas conforme caducan. No hace falta correr purga manual.
+3. PURGAR fotos: `python3 purgar.py` (borra de `ofertas.xlsx` los anuncios con >10 días y
+   de los dos Excels de convocatorias las de vigencia pasada — cada archivo con su regla).
 4. Verificar con Node (mismo flujo SheetJS) y el usuario refresca Live Server.
 
 ## ANTI-DUPLICADOS (imágenes y datos repetidos) — decidido por el usuario 2026-09-17
@@ -426,9 +549,12 @@ Todos/Fotos/Portaltrabajo (ONPE) con contador, arriba de la lista de ofertas (pe
 
 ## Archivos de la carpeta
 `index.html`, `script.js`, `ofertas.xlsx`, `convocatorias.xlsx`, `convocatorias_onpe.json`,
-`cursos.xlsx`, `cursos.json`, `xlsx.full.min.js`, `scraper_onpe.py`, `scraper_capacita.py`,
-`purgar.py`, `verificar_duplicados.py`, y la carpeta **`images/`** con los JPEG de los
-anuncios (ya procesadas por OCR).
+`convocatoriasdetrabajo.xlsx`, `convocatoriasdetrabajo.json`, `cursos.xlsx`, `cursos.json`,
+`xlsx.full.min.js`, `scraper_onpe.py`, `scraper_convocatoriasdetrabajo.py`,
+`scraper_capacita.py`, `purgar.py`, `verificar_duplicados.py`, la carpeta **`images/`**
+con los JPEG de los anuncios (ya procesadas por OCR) y la carpeta **`fotos/`** con las 84
+imágenes ilustrativas (60 de rubro de trabajos + 20 de institución de cursos + 4 de votación
+para las convocatorias ONPE; 4 por rubro/segmento, ver FOTOS ILUSTRATIVAS).
 
 ## CURSOS GRATUITOS CAPACITA-T (MTPE) — 3ª FUENTE (decidida por el usuario 2026-09-16)
 - **Scraper**: `scraper_capacita.py`. Origen `capacitacionlaboral.trabajo.gob.pe/cursos/`.
