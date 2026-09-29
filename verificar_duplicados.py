@@ -112,8 +112,12 @@ def imagenes_similares():
     parecidas  : pares (d, a, b) con DIF_MISMA_FOTO < dif < DIF_PARECIDA -> REVISAR.
     Se saltan los pares ya detectados por SHA-1 (byte a byte).
     """
+    EXT_IMG = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
     archivos = sorted(glob.glob(os.path.join(CARPETA_IMAGES, "*")))
-    archivos = sorted(a for a in archivos if os.path.isfile(a))
+    # solo imágenes: el usuario a veces deja en images/ PDFs u otros adjuntos
+    # que Pillow no puede abrir (rompía el escaneo completo).
+    archivos = sorted(a for a in archivos
+                      if os.path.isfile(a) and a.lower().endswith(EXT_IMG))
     if not _PILLOW or len(archivos) < 2:
         return [], []
 

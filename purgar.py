@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Purgar anuncios viejos de los Excels (BD de la página).
 
-  - ofertas.xlsx (fotos)      -> se purgan por ANTIGÜEDAD (más de DIAS_MAX días).
+  - ofertas.xlsx (fotos)      -> se purgan por ANTIGÜEDAD (más de DIAS_MAX días), pero
+    las que tienen WhatsApp viven DIAS_MAX_WHATSAPP días (14), igual que en script.js.
   - convocatorias.xlsx (ONPE) -> se purgan por su fecha LÍMITE (columna `vigencia`):
     cuando la vigencia YA PASÓ se borran; las "hasta completar vacantes" (sin fecha
     límite) se quedan mientras el scraping las siga publicando.
@@ -21,6 +22,7 @@ from datetime import date, timedelta
 import openpyxl
 
 DIAS_MAX = 10
+DIAS_MAX_WHATSAPP = 14  # las que tienen WhatsApp viven 4 días más (ver script.js)
 ARCHIVOS = ["ofertas.xlsx", "convocatorias.xlsx"]
 CONV_ESTADO = "convocatoriasdetrabajo.xlsx"
 
@@ -35,9 +37,17 @@ def serie_a_iso(v):
 
 
 def purgar(archivo, dias=DIAS_MAX, silencio=False):
+    """Borra las ofertas más viejas que su plazo. Las que tienen WhatsApp se
+    quedan DIAS_MAX_WHATSAPP días, la misma regla que aplica la página."""
     wb = openpyxl.load_workbook(archivo)
     ws = wb.active
-    corte = date.today() - timedelta(days=dias)
+    # Columna 'whatsapp': se busca por nombre, como el resto del script.
+    col_wa = None
+    for c in range(1, ws.max_column + 1):
+        if str(ws.cell(row=1, column=c).value or "").strip().lower() == "whatsapp":
+            col_wa = c
+            break
+    hoy = date.today()
     borradas = 0
     for fila in range(ws.max_row, 1, -1):
         fecha_raw = ws.cell(row=fila, column=9).value  # columna 'fecha'
@@ -48,12 +58,15 @@ def purgar(archivo, dias=DIAS_MAX, silencio=False):
             f = date.fromisoformat(iso)
         except ValueError:
             continue
-        if f < corte:
+        tiene_wa = bool(col_wa) and bool(ws.cell(row=fila, column=col_wa).value)
+        limite = dias + (DIAS_MAX_WHATSAPP - DIAS_MAX if tiene_wa else 0)
+        if f < hoy - timedelta(days=limite):
             ws.delete_rows(fila, 1)
             borradas += 1
     wb.save(archivo)
     if not silencio:
-        print(f"  {archivo}: borradas {borradas} filas (corte {corte}, anterior a {dias} días)")
+        print(f"  {archivo}: borradas {borradas} filas "
+              f"(fotos {dias} días, con WhatsApp {dias + DIAS_MAX_WHATSAPP - DIAS_MAX} más)")
     return borradas
 
 

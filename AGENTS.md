@@ -33,9 +33,15 @@ usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
 (se marca `visible=no` y queda en el Excel).
 
 ## REGLA DE VIGENCIA — decidida por el usuario 2026-09-15 (criterio ONPE añadido 2026-09-25)
-- **FOTOS (`ofertas.xlsx`): 10 días desde la subida**. `script.js` NO los muestra
-  (filtro `esReciente()`, `DIAS_MAX = 10`). `purgar.py` los BORRA del Excel:
-  `python3 purgar.py` (usa columna `fecha`).
+- **FOTOS (`ofertas.xlsx`): 10 días desde la subida; 14 si tienen WHATSAPP** (decisión
+  del usuario 2026-09-28: "pon todos los de whatsapp, dales 4 días más en la página y
+  luego los bajamos"). En `script.js`, `esReciente()` usa `DIAS_MAX = 10` pero sube a
+  `DIAS_MAX_WHATSAPP = 14` cuando la fila trae número en la columna `whatsapp` (es decir,
+  si se puede escribir por WhatsApp). `purgar.py` aplica LA MISMA regla (constante
+  `DIAS_MAX_WHATSAPP = 14` + busca la columna `whatsapp` por nombre), para que el Excel
+  nunca borre una oferta que la página todavía está mostrando. OJO: cuando se bajen a
+  mano las que ya cumplieron, basta con volver a 10/10 en los DOS archivos
+  (`script.js` y `purgar.py`) — tienen que coincidir siempre.
 - **La fecha de subida manda (decidido por el usuario 2026-09-17)**: los 10 días se cuentan
   DESDE la fecha en que se sube la imagen (columna `fecha` = día de subida, no el día del
   cartel). Si hoy se suben 20 fotos, todas llevan `fecha` = fecha de HOY. Al registrar cada
@@ -111,13 +117,42 @@ usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
   `"institución"` (todas las sedes) o `"institución|sede"` (una sede); `filtrar()` combina
   institución + sede + TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA + chips de región +
   buscador. Cada tarjeta lleva `data-institucion` y `data-sede` (ubicación normalizada).
-- **TARJETAS DESTACADAS con >2 botones** (2026-09-28, decisión del usuario): la sección
-  "★ DESTACADA" ya NO son las 3 más recientes, sino las 3 más recientes ENTRE las ofertas
-  con MÁS DE 2 botones accionables (`botonesDe(o)` en script.js: `funciones`/`postular`
-  suman 1, `ver_detalles` y `guia_registro` suman 1 c/u, el respaldo `enlace` suma 1, y
-  `whatsapp` suma 2 por LLAMAR+WHATSAPP). Razón del usuario: "en algunos casos no podemos
-  postular, dice que podemos ver la convocatoria pero no nos sirve de nada si después no
-  podemos postular" → una tarjeta que solo manda a "VER CONVOCATORIA" no se destaca.
+- **TARJETAS DESTACADAS: 2 fotos + 1 convocatoria** (2026-09-28, REVISADO DOS VECES por el
+  usuario). La sección "★ DESTACADA" son 3 tarjetas, pero **NO** las 3 más recientes a secas
+  ni con filtro de botones. Historia del cambio:
+  1. Primera versión: las 3 más recientes con MÁS DE 2 botones (`botonesDe(o)`), para no
+     destacar una convocatoria que solo manda a "VER CONVOCATORIA".
+  2. El usuario lo rechazó al ver que **las fotos nuevas NUNCA salían**: las fotos tienen
+     exactamente 2 botones (LLAMAR + WHATSAPP) y el filtro pedía 3. Decisión: "las 3 más
+     recientes, sin ningún filtro".
+  3. Al aplicarlo, el día que coincide con un scrape el scraper ganaba siempre (sus ids son
+     de 5 dígitos, 89628-89666, y los de foto son 12-103; el desempate por id no es
+     comparable entre archivos).
+  4. **DECISIÓN FINAL (2026-09-28, la que está en el código): al AZAR y por tipo** — "en el
+     destacado pon al azar 2 de whatsapp y uno con enlace". Se abandonan tanto el orden por
+     fecha como el reparto 2 fotos + 1 convocatoria.
+  Implementación: `renderDestacado()` en script.js con las constantes
+  `DESTACADAS_WHATSAPP = 2`, `DESTACADAS_ENLACE = 1` y `POOL_DESTACADAS = 40`, más el helper
+  `barajar()` (Fisher-Yates con `Math.random`). El charco son las **40 más recientes** por
+  `ordenPorFecha()` (para no destacar nada a punto de caducar); se baraja, se toman 2 con
+  número en `whatsapp` y 1 con `esEnlazada()` (POSTULAR/VER BASES/VIDEO) que no sea una de
+  las anteriores; si un tipo no llega a su cuota se rellena con lo que quede del charco, y
+  siempre salen 3. Como es al azar, **cada recarga muestra 3 tarjetas distintas** (probado
+  con 300 simulaciones: siempre 3 tarjetas, 2 con WHATSAPP y 1 con enlace). OJO: la función
+  `botonesDe()` **ya NO EXISTE** (se borró al quedar sin uso); no reintroducirla.
+- **BUG CORREGIDO 2026-09-28 — orden por fecha con `fecha` vacía** (importante, no
+  reintroducir): 103 ofertas visibles vienen SIN columna `fecha` (las 114 de
+  `convocatoriasdetrabajo.xlsx` que son PUESTOS por carrera `Universitarios`/`Técnicos`, y
+  ONPE "hasta completar vacantes" sin `fecha` legible). El código ordenaba con
+  `new Date(serieFecha(b.fecha)) - new Date(serieFecha(a.fecha))`; con `fecha` vacía,
+  `serieFecha('')` devuelve `''` y `new Date('')` es una fecha **INVÁLIDA**, así que la
+  resta da **NaN**. `Array.sort()` con un comparador que devuelve NaN **no ordena nada** y
+  deja el orden arbitrario: por eso unas/cards del scraper con id 632695/632696 se
+  colaban en "destacadas" y en la lista por tener el id más alto, y las fotos de hoy
+  quedaban enterradas. **Solución**: el helper `ordenPorFecha(a, b)` en script.js, que
+  convierte la fecha a milisegundos y devuelve `-Infinity` si falta o es inválida (una
+  fecha ausente cuenta como LO MÁS VIEJA), con desempate por id mayor. Se usa en los 3
+  sitios que ordenan: los dos `.sort()` de la carga de datos y `renderDestacado()`.
 - **Columnas mostradas**: col `duracion` (ej. "8 horas"), `certifica` (si/no) y DOBLE botón:
   EMPEZAR CURSO (`empezar_curso` = plataforma LMS del curso) + VER RUTA (`ver_ruta` =
   ruta formativa). La tarjeta NO lleva LLAMAR/WHATSAPP (los cursos no tienen contacto).
@@ -292,6 +327,37 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   palabras clave de `FOTOS_RUBROS` (foto del rubro del puesto, ej. "médicos"->salud,
   "conductores"->chofer, "prácticas de oficina"->oficina).
 
+## COBERTURA DE LA PÁGINA — qué se publica y qué NO (2026-09-28, revisado tras el lote)
+Controles verificados con Node/SheetJS el 2026-09-28 por la noche (**296 tarjetas**):
+
+| Fuente | En el Excel | En la página | Por qué la diferencia |
+|---|---|---|---|
+| Fotos (`ofertas.xlsx`) | 103 filas / 101 `visible=si` | **95** | 6 caducaron (más de 10 días SIN WhatsApp o más de 14 CON WhatsApp) |
+| ONPE (`convocatorias.xlsx`) | 46 | 36 | 5 ya con `vigencia` pasada + 5 `visible=no` |
+| Estado (`convocatoriasdetrabajo.xlsx`) | 372 | **165** | 207 sin enlace directo (regla `puedePostular()`) |
+| Cursos (`cursos.xlsx`) | 214 | 214 | no caducan |
+
+OJO: al subir las 14 días solo para las que tienen WhatsApp, casi todas las fotos sobrevivieron
+y la página pasó de 46 a 95 tarjetas de fotos. Antes (con 10 días planos) eran 46.
+
+Lo que **NO** aparece, y por qué (para no "arreglar" cosas que están bien):
+- **57 de las 71 fotos**: la regla de los 10 días. Son los anuncios del 15-18 set;
+  `purgar.py` ya borró varios del Excel. No es bug.
+- **196 de las 372 del Estado**: decisión del usuario 2026-09-28 (ver `puedePostular()`),
+  porque sin botón de trámite la tarjeta no sirve. La portada del sitio publica ~270
+  vigentes con pill "Finaliza en N días" y el "3000+" que anuncia cuenta cada PUESTO
+  por separado (incluye finalizadas) — ese número NO se usa.
+- **Histórico del feed ONPE**: el feed tiene 767+ anuncios; `scraper_onpe.py` se ha
+  corrido con `--max 150` (las últimas). Las viejas ya están cerradas, así que no se
+  pierden ofertas vigentes, pero el feed completo nunca se ha descargado. Para cerrar ese
+  hueco: `python3 scraper_onpe.py --todo`.
+- **Dedupe** (`dedupeOfertas`): si puesto+número+lugar+empresa coinciden, se publica 1 sola.
+
+Único bloque 100% completo: los **214 cursos**.
+Palancas para más cobertura si el usuario las pide: (1) `scraper_onpe.py --todo`,
+(2) revisar si `puedePostular()` es demasiado estricto con esas 196 (auditar si sus
+botones existen y el scraper no los reconoció).
+
 ## Conceptos importantes (lecciones aprendidas — aplicar SIEMPRE)
 - **NUNCA comparar horas sueltas con fechas "solo-día"**: `new Date("2026-09-17")` se
   parsea como MEDIANOCHE UTC (por ser formato ISO de fecha sin hora), mientras que
@@ -405,7 +471,82 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   ("Otro") cae en la genérica `trabajo.jpg`. Se inyecta como PRIMER hijo del `<article>`
   en `crearTarjetaCurso()` (misma `.tarjeta-foto`, mismo CSS, sin cambios de style).
 
-## Estado actual (snapshot 2026-09-18 — 17 imágenes nuevas subidas)
+## Estado actual (snapshot 2026-09-28 — 50 imágenes nuevas procesadas)
+**50 imágenes nuevas del 28/09 en `images/` (`IMG-20260928-WA00xx.jpg`). Resultado:
+30 ofertas NUEVAS registradas (ids 74-103) + 2 actualizaciones (ids 12 y 31), todo con
+`fecha`=2026-09-28.**
+
+**a) NO SON TRABAJOS -> 12 imágenes ignoradas (12):** WA0014 (auto en venta), WA0016
+(alquiler "para pelar lechón"), WA0043 (remate de lotes 200 m²), WA0053 (se alquilan 12
+habitaciones), WA0056 (vende camioneta Hilux 2023), WA0062 (traspasa restaurante), WA0063
+(alquiler 02 cuartos), WA0065 **== WA0072** (1,1% = MISMA FOTO re-comprimida, traspaso de
+quinta/restaurante), WA0070 (alquila casa), WA0076 (alquila local comercial), WA0078
+(vende camioneta 4x4), WA0082 (traspasa restaurante por viaje).
+
+**b) DUPLICADOS EXACTOS por SHA-1 de fotos ya publicadas -> 3 ignoradas:** WA0035 (==
+`5774620d` = id 19 KANGYX), WA0042 (== `4aa46031` = id 9 tienda de cerámica),
+WA0048 (== `14.54.45` = id 7/60 Antapaccay).
+
+**c) REPETIDAS de ofertas ya publicadas (decidido por el usuario: IGNORAR) -> 2:**
+- WA0022 (Concesionaria de alimentos, cocinero+ayudante+moza, 6 días, **WA 931823945**)
+  = **id 42** (mismo número, mismo texto).
+- WA0036 (Chocñihuaqui-Cayarani-Condesuyos-Arequipa, obra de cimentación para torres de
+  alta tensión, 20x10, operarios/oficiales/fierreros/carpinteros/conductores/retroexcavadora,
+  **WA 957085375**) = **id 11** (mismo número, misma obra). El nombre del sello de WA0036
+  salió como "CORTICLLA S.A.C" (incierto) y no hizo falta resolverlo al ser duplicado.
+
+**d) ACTUALIZACIONES (decidido por el usuario):**
+- **id 12** -> ahora "**Cocinero y ayudantes de cocina (PITT TIEN)**", empresa `PITT TIEN`,
+  descripción completa (cocinero + ayudante con exp. + ayudante sin exp., Av. San Martín
+  esquina Hotel Santa Isabel, sueldo justo) con los 2 números: llamada 956102670 y
+  WhatsApp 910006315. `fecha`=2026-09-28 (vuelve a estar visible).
+- **id 31** -> se le añade el horario que faltaba: "2 ayudantes de cocina (señora, señorita
+  o joven) **medio tiempo 3:00-9:00 p.m. o tiempo completo** y 1 moza TC o MT".
+  (WA0085 era el mismo aviso; no se registró aparte.)
+
+**e) 30 OFERTAS NUEVAS (ids 74-103), todas `fecha`=2026-09-28, `visible=si`, `contacto`=llamada:**
+74 Ayudante de cocina, bajillero y mozos (concesionaria) 940831074 ·
+75 2 personas para carwash 993155333 · 76 02 ayudantes para cargar/descargar/distribuir gas
+968590996 · 77 Cocineros, cajeras, mozas y meseras (restaurante apertura) 910188719 ·
+78 Recepcionista de hotel 2-9 p.m. 958152303 · 79 Moza o ayudante Pizzas de Freddy
+975215425 · 80 Asistente contable + administración + soldadores/mecánicos/carpinteros/
+encofradores 938289220 · 81 Vajillera 957781614 · 82 Técnica farmacia o enfermería (botica)
+940879960 · 83 Jóvenes para delivery 949703993 · 84 Señora/señorita limpieza en hospedaje
+974277627 · 85 Señorita de buena presencia TC o MT, **S/1,600** 966179195 ·
+86 02 personal limpieza hospedaje + persona responsable 956760688 · 87 Cuidado de 3 niños
+(**Arequipa**) 972930114 · 88 Ayudante de cocina y mozo 974410495 · 89 Señorita limpieza
+hospedaje 910916143 · 90 Personal para hotel (ref. terminal antiguo) 959164789 ·
+91 1 pollero y 1 cocinero para **Santo Tomás - Cusco** 900080146 · 92 Señora/señorita limpieza
+hospedaje 958769976 · 93 Señorita con cosmetología 964365593 · 94 Urgente ayudante para
+camión 998474614 · 95 1 pollero y 1 cocinero Santo Tomás (**otro nº** 967195137) ·
+96 Técnica farmacia o enfermería, **se aceptan practicantes**, Av. Sol 969330822 ·
+97 Señorita para restobar 984792226 · 98 Ayudante mecánico automotriz 957061565 ·
+99/100/101 **Operador de cargador frontal / de tractor oruga / de excavadora** — empresa
+`Maquinaria y Servicios Alto Huarca S.A.`, Espinar - Cusco, 14x7, ambos contactos
+959319697 / 944886626 (decisión del usuario: 3 TARJETAS SEPARADAS, una por máquina) ·
+102 Atención al cliente, logística, distribución y empaquetado (18-25 años), **S/1,250 +
+almuerzo** 917799231 · 103 Técnico de planos (construcción civil o cadista), empresa
+`Consultora y Constructora Edifica` (**ubicación puesta "Espinar - Cusco" por decisión del
+usuario, el cartel NO dice ciudad**), contactos 949302068 / 918154152.
+
+**Avisos que quedan abiertos (el usuario NO llegó a decidir):**
+- **ids 91 y 95**: mismo puesto y mismo lugar ("1 pollero y 1 cocinero para Santo Tomás"),
+  distinto número. Se publicaron los DOS (como ids 7/60). Si el usuario quiere una sola,
+  oculta la otra con `visible=no`.
+- **id 85 vs id 30**: mismo número 966179195, distinto puesto (el usuario dijo
+  "es otra vacante: registrar").
+
+**Página después de este lote (verificado con Node/SheetJS):** 46 fotos + 36 ONPE + 165
+Estado = **247 tarjetas** (+214 cursos). Las 30 nuevas salen con chip "Subido hoy".
+Bajaron 5 ONPE y 11 del Estado respecto al 28/09 temprano: Their `vigencia` ya pasó y
+`esReciente()` las oculta (normal, la purga por vigencia hace su trabajo al re-scrapear).
+
+**Nota técnica (2026-09-28):** `verificar_duplicados.py` rompía con
+`PIL.UnidentifiedImageError` porque `images/` ahora tiene un PDF
+(`spaceship-d5800ef8-...pdf`) y el globtomaba todo. Corregido en `imagenes_similares()`:
+filtra por extensión de imagen (`.jpg .jpeg .png .gif .webp .bmp`).
+
+## Estado anterior (snapshot 2026-09-18 — 17 imágenes nuevas subidas)
 
 **17 imágenes nuevas del 18/09 en `images/`, de las cuales 2 eran DUPLICADOS SHA-1 de
 fotos ya procesadas** (se IGNORARON, no se registraron):

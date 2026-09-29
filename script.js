@@ -33,10 +33,10 @@ Promise.all(FUENTES.map(f =>
 ))
   .then(arrays => {
     const todos = [].concat(...arrays);
-    const cursos  = todos.filter(o => o._origen === 'Capacita')
-      .sort((a, b) => new Date(serieFecha(b.fecha)) - new Date(serieFecha(a.fecha)));
-    const ofertas = dedupeOfertas(todos.filter(o => o._origen !== 'Capacita')
-      .sort((a, b) => new Date(serieFecha(b.fecha)) - new Date(serieFecha(a.fecha))));
+    const cursos  = todos.filter(o => o._origen === 'Capacita').sort(ordenPorFecha);
+    const ofertas = dedupeOfertas(
+      todos.filter(o => o._origen !== 'Capacita').sort(ordenPorFecha)
+    );
     renderizar(ofertas);
     renderCursos(cursos);
   })
@@ -69,6 +69,23 @@ function esCurso(o) {
   return !!(o.empezar_curso || o.ver_ruta);
 }
 
+// Ordena por fecha de la más NUEVA a la más vieja, con desempate por id mayor.
+// Importante: 114 convocatorias del Estado (los PUESTOS por carrera) y algunas
+// ONPE vienen SIN columna `fecha`. `new Date('')` es una fecha INVÁLIDA, y
+// compararla devuelve NaN: Array.sort() con NaN no ordena nada y deja el orden
+// como casualmente venga, por lo que esas tarjetas se colaban en "destacadas"
+// (y en la lista) por tener el id más alto. Aquí una fecha ausente cuenta como
+// LO MÁS VIEJA, así lo reciente (fotos de hoy, scrapeos nuevos) va siempre arriba.
+function ordenPorFecha(a, b) {
+  const ms = o => {
+    const f = serieFecha(o.fecha);
+    if (!f) return -Infinity;
+    const t = new Date(f.length === 10 ? f + 'T00:00:00' : f).getTime();
+    return isNaN(t) ? -Infinity : t;
+  };
+  return (ms(b) - ms(a)) || ((Number(b.id) || 0) - (Number(a.id) || 0));
+}
+
 // Los enteros de fecha de Excel (45358...) se convierten a formato ISO.
 function serieFecha(v) {
   if (!v) return '';
@@ -96,11 +113,16 @@ function diasDesdeHoy(iso) {
 }
 
 // Regla de vigencia (2026-09-25):
-//   - FOTOS: 10 días desde la subida (columna `fecha`).
+//   - FOTOS: 10 días desde la subida (columna `fecha`), pero las que tienen
+//     número de WhatsApp se quedan 4 días más (14 en total) — decisión del
+//     usuario 2026-09-28: "pon todos los de whatsapp, dales 4 días más en la
+//     página y luego los bajamos". El contacto por WhatsApp sigue sirviendo
+//     más tiempo, así que esas se quieren vivas más días.
 //   - CONVOCATORIAS ONPE y del Estado (Portaltrabajo / Convocatorias): se
 //     mantienen hasta su fecha LÍMITE (columna `vigencia`). Si no traen fecha
 //     ("hasta completar vacantes") se quedan mientras el scraping las publique.
 const DIAS_MAX = 10;
+const DIAS_MAX_WHATSAPP = 14;
 function esReciente(o) {
   if (o._origen === 'Portaltrabajo' || o._origen === 'Convocatorias') {
     const iso = serieFecha(o.vigencia);
@@ -114,7 +136,8 @@ function esReciente(o) {
   const iso = serieFecha(o.fecha);
   if (!iso) return false;
   const dias = diasDesdeHoy(iso);
-  return dias !== null && dias >= 0 && dias <= DIAS_MAX;
+  if (dias === null || dias < 0) return false;
+  return dias <= (o.whatsapp ? DIAS_MAX_WHATSAPP : DIAS_MAX);
 }
 
 // El contacto por llamada (columna `contacto=llamada`) abre el teléfono;
@@ -405,33 +428,51 @@ function renderFiltroOrigen(ofertas) {
   document.getElementById('filtroSelInstitucion').addEventListener('change', filtrar);
 }
 
-// Ofertas destacadas: SIEMPRE 3 (si hay). Mandan las más recientes con MÁS DE 2
-// botones accionables (postular/bases/video/llamar); si no llegan a 3, el resto
-// se tapa con las ofertas más recientes sea cual sea su número de botones y quien
-// solo manda a "VER CONVOCATORIA" ya no protagoniza la vitrina. Si empatan en
-// fecha, manda el de id mayor.
+// Ofertas destacadas: SIEMPRE 3 (si hay), elegidas AL AZAR y por tipo (decisión
+// del usuario 2026-09-28: "en el destacado pon al azar 2 de whatsapp y uno con
+// enlace"). Antes eran las 3 más recientes, pero un mismo día trae a la vez
+// fotos subidas a mano y tarjetas del scraper, y como sus ids no son
+// comparables (los del scraper son de 5 dígitos) el desempate por fecha
+// siempre favorece al mismo origen. El azar reparte mejor la vitrina.
+//   - 2 con número de WhatsApp (botón WHATSAPP: normalmente las fotos, que se
+//     contactan por WhatsApp o llamada),
+//   - 1 con enlace (POSTULAR / VER BASES / VIDEO, según `esEnlazada()`).
+// Se sacan del charco de las `POOL_DESTACADAS` MÁS RECIENTES para que la vitrina
+// no muestre una vacante a punto de caducar. Cada recarga de la página puede
+// mostrar 3 distintas. La oferta ya elegida para WhatsApp no se repite como la de
+// enlace, y si un tipo no llega a su cuota se rellena con cualquier otra del
+// charco para que siempre haya 3.
+const DESTACADAS_WHATSAPP = 2;
+const DESTACADAS_ENLACE = 1;
+const POOL_DESTACADAS = 40;
+function barajar(lista) {
+  const a = lista.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 function renderDestacado(ofertas) {
   const cont = document.getElementById('destacado');
   if (!ofertas.length) return;
-  const porFecha = (a, b) => {
-    const d = new Date(serieFecha(b.fecha)) - new Date(serieFecha(a.fecha));
-    return d || (Number(b.id) || 0) - (Number(a.id) || 0);
-  };
-  const conBotones = ofertas.filter(o => botonesDe(o) > 2).sort(porFecha);
-  const destacadas = conBotones.slice(0, 3);
+  const pool = ofertas.slice().sort(ordenPorFecha).slice(0, POOL_DESTACADAS);
+  const destacadas = [];
+  barajar(pool.filter(o => o.whatsapp))
+    .slice(0, DESTACADAS_WHATSAPP)
+    .forEach(o => destacadas.push(o));
+  barajar(pool.filter(o => esEnlazada(o) && !destacadas.includes(o)))
+    .slice(0, DESTACADAS_ENLACE)
+    .forEach(o => destacadas.push(o));
+  // Si un tipo no llegó a su cuota, se completa con lo que quede del charco.
   if (destacadas.length < 3) {
-    const relleno = ofertas
-      .filter(o => destacaYaNo(conBotones, o))
-      .sort(porFecha)
-      .slice(0, 3 - destacadas.length);
-    destacadas.push(...relleno);
+    barajar(pool.filter(o => !destacadas.includes(o)))
+      .slice(0, 3 - destacadas.length)
+      .forEach(o => destacadas.push(o));
   }
   cont.innerHTML = destacadas.length
     ? `<div class="destacado-grid">${destacadas.map((o, i) => crearTarjetaDestacada(o, i)).join('')}</div>`
     : '';
-}
-function destacaYaNo(conBotones, o) {
-  return !conBotones.some(x => x === o);
 }
 
 function crearTarjetaDestacada(o, i) {
@@ -703,23 +744,6 @@ function botonWhatsapp(o) {
   const m = encodeURIComponent('Hola, me interesa el puesto de ' + o.titulo);
   return `<a class="boton boton-llamada" href="tel:+51${n}" rel="noopener">LLAMAR</a>` +
     `<a class="boton boton-whatsapp" href="https://wa.me/51${n}?text=${m}" target="_blank" rel="noopener">WHATSAPP</a>`;
-}
-
-// Cantidad de botones ACCIONABLES que renderiza cada tarjeta (los que llevan a
-// postular/ver bases/video/llamar). Las DESTACADAS solo muestran ofertas con
-// MÁS DE 2 botones: una tarjeta que solo dice "VER CONVOCATORIA" no sirve como
-// destacada porque no se puede postular a nada (decisión del usuario 2026-09-28).
-function botonesDe(o) {
-  let n = 0;
-  if (o.funciones) n++;
-  if (o.postular) n++;
-  if (o._origen === 'Convocatorias') {
-    if (o.ver_detalles) n++;
-    if (o.guia_registro) n++;
-    if (!(o.postular || o.ver_detalles || o.guia_registro) && o.enlace) n++;
-  }
-  if (o.whatsapp) n += 2; // LLAMAR + WHATSAPP
-  return n;
 }
 
 // "15 sep" (añade el año solo si no es el actual) y "15 de setiembre de 2026".
