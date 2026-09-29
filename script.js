@@ -26,6 +26,7 @@ Promise.all(FUENTES.map(f =>
       return (XLSX.utils.sheet_to_json(hoja, { defval: '' }))
         .filter(esOfertaVisible)
         .map(o => Object.assign(o, { _origen: f._origen })) // _origen ANTES del filtro: esReciente lo usa
+        .filter(puedePostular)                                // solo convocatorias a las que SÍ se postula
         .filter(o => esCurso(o) || esReciente(o));          // solo las ofertas/convocatorias caducan
     })
     .catch(() => [])
@@ -49,6 +50,16 @@ Promise.all(FUENTES.map(f =>
 function esOfertaVisible(o) {
   if (!o.titulo) return false;
   return !['no', '0', 'false', 'NO'].includes(String(o.visible || '').trim().toLowerCase());
+}
+
+// "De qué me sirve que los vean si no pueden postular" (decisión del usuario
+// 2026-09-28): una convocatoria del Estado solo merece mostrarse si trae un
+// enlace DIRECTO para actuar (POSTULAR / VER BASES / CÓMO POSTULAR). Las que
+// solo tienen el respaldo "VER CONVOCATORIA" (sin ningún link directo) se
+// ocultan. Fotos (se contacta por llamada/whatsapp) y ONPE (postular) no se tocan.
+function puedePostular(o) {
+  if (o._origen !== 'Convocatorias') return true;
+  return !!(o.postular || o.ver_detalles || o.guia_registro);
 }
 
 // Un registro es CURSO si viene de cursos.xlsx (Capacita-T MTPE). Solo los que
@@ -320,45 +331,107 @@ function renderizar(ofertas) {
   renderGrid(ofertas);
 }
 
-// ---------- Filtro por INSTITUCIÓN (columna `empresa`) ----------
-// Select desplegable arriba de la lista (no se muestra todo como botones):
-// "Todas las instituciones" + cada institución con su contador. Al elegir una,
-// solo se ven sus convocatorias.
+// ---------- Filtro por INSTITUCIÓN y SEDE (columnas `empresa` y `ubicacion`) ----------
+// Select desplegable arriba de la lista. Cada institución es un GRUPO
+// (optgroup) con una opción por SEDE/ubicación (o.la directa si tiene una sola).
+// Ej: <optgroup "PODER JUDICIAL (6)"> -> "Todas las sedes (6)" + "Lima (4)" + ...
+// Las ofertas de fotos (sin institución) van en el grupo "Sin institución".
+// Valor del <option>: "ins" (todas las sedes) o "ins|sede" (una sede concreta);
+// Valor del <option>: "ins" (todas las sedes) o "ins|sede" (una sede concreta);
+// la opción global "Todas las instituciones" vale "". Marcador interno para las
+// tarjetas que NO traen institución (fotos sueltas): grupo "Sin institución".
+const INST_SIN = '__sini__';
 function renderFiltroOrigen(ofertas) {
   const cont = document.getElementById('filtroOrigen');
   if (!cont) return;
-  const conteo = {};
-  const etiquetas = {};
+  const institucion = {},
+    sedes = {},
+    etiquetaIns = {},
+    etiquetaSede = {};
   ofertas.forEach(o => {
     const ins = normalizar(o.empresa || '');
-    if (!ins) return;
-    conteo[ins] = (conteo[ins] || 0) + 1;
-    etiquetas[ins] = etiquetas[ins] || String(o.empresa).trim();
+    const sede = normalizar(o.ubicacion || '');
+    institucion[ins] = (institucion[ins] || 0) + 1; // '' = sin institución
+    if (ins) etiquetaIns[ins] = etiquetaIns[ins] || String(o.empresa).trim();
+    const key = ins + '\u001f' + sede;
+    sedes[key] = (sedes[key] || 0) + 1;
+    etiquetaSede[key] = etiquetaSede[key] || String(o.ubicacion || '').trim() || 'Sin sede';
   });
-  const lista = Object.entries(conteo)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const opcion = (ins, nombre, n) =>
-    `<option value="${e(ins)}">${e(nombre)} (${n})</option>`;
+  const ordenIns = Object.keys(institucion)
+    .filter(i => i)
+    .sort((a, b) => institucion[b] - institucion[a] || a.localeCompare(b));
+
+  const opcion = (val, nombre, n) =>
+    `<option value="${e(val)}">${e(nombre)} (${n})</option>`;
+
+  let opts = opcion('', 'Todas las instituciones', ofertas.length);
+  ordenIns.forEach(ins => {
+    const total = institucion[ins];
+    const misSedes = Object.keys(sedes)
+      .filter(k => k.startsWith(ins + '\u001f'))
+      .sort((a, b) => sedes[b] - sedes[a]);
+    const etiqueta = etiquetaIns[ins] || ins;
+    if (misSedes.length <= 1) {
+      const k = misSedes[0];
+      const sede = k.split('\u001f')[1];
+      opts += opcion(ins + '|' + sede, etiqueta, total);
+    } else {
+      opts += `<optgroup label="${e(etiqueta + ' (' + total + ')')}">`;
+      opts += opcion(ins + '|', 'Todas las sedes', total);
+      misSedes.forEach(k => {
+        const sede = k.split('\u001f')[1];
+        opts += opcion(ins + '|' + sede, etiquetaSede[k] || sede, sedes[k]);
+      });
+      opts += `</optgroup>`;
+    }
+  });
+  if (institucion[''] > 0) {
+    const totalSin = institucion[''];
+    const misSedes = Object.keys(sedes)
+      .filter(k => k.startsWith('\u001f'))
+      .sort((a, b) => sedes[b] - sedes[a]);
+    if (misSedes.length <= 1) {
+      opts += opcion(INST_SIN + '|' + (misSedes[0] ? misSedes[0].split('\u001f')[1] : ''), 'Sin institución', totalSin);
+    } else {
+      opts += `<optgroup label="Sin institución (${totalSin})">`;
+      opts += opcion(INST_SIN + '|', 'Todas las sedes', totalSin);
+      misSedes.forEach(k => opts += opcion(INST_SIN + '|' + k.split('\u001f')[1], etiquetaSede[k], sedes[k]));
+      opts += `</optgroup>`;
+    }
+  }
   cont.innerHTML =
     `<label class="lbl-inst" for="filtroSelInstitucion">Institución</label>` +
-    `<select id="filtroSelInstitucion" class="select-institucion">` +
-    opcion('', 'Todas las instituciones', ofertas.length) +
-    lista.map(([ins, n]) => opcion(ins, etiquetas[ins], n)).join('') +
-    `</select>`;
+    `<select id="filtroSelInstitucion" class="select-institucion">${opts}</select>`;
   document.getElementById('filtroSelInstitucion').addEventListener('change', filtrar);
 }
 
-// Ofertas destacadas = los 3 trabajos MÁS RECIENTES (últimos subidos), resaltados
-// arriba de la lista. Si empatan en fecha, manda el de id mayor (el último en
-// registrarse ese día).
+// Ofertas destacadas: SIEMPRE 3 (si hay). Mandan las más recientes con MÁS DE 2
+// botones accionables (postular/bases/video/llamar); si no llegan a 3, el resto
+// se tapa con las ofertas más recientes sea cual sea su número de botones y quien
+// solo manda a "VER CONVOCATORIA" ya no protagoniza la vitrina. Si empatan en
+// fecha, manda el de id mayor.
 function renderDestacado(ofertas) {
   const cont = document.getElementById('destacado');
   if (!ofertas.length) return;
-  const recientes = ofertas.slice().sort((a, b) => {
+  const porFecha = (a, b) => {
     const d = new Date(serieFecha(b.fecha)) - new Date(serieFecha(a.fecha));
     return d || (Number(b.id) || 0) - (Number(a.id) || 0);
-  }).slice(0, 3);
-cont.innerHTML = `<div class="destacado-grid">${recientes.map((o, i) => crearTarjetaDestacada(o, i)).join('')}</div>`;
+  };
+  const conBotones = ofertas.filter(o => botonesDe(o) > 2).sort(porFecha);
+  const destacadas = conBotones.slice(0, 3);
+  if (destacadas.length < 3) {
+    const relleno = ofertas
+      .filter(o => destacaYaNo(conBotones, o))
+      .sort(porFecha)
+      .slice(0, 3 - destacadas.length);
+    destacadas.push(...relleno);
+  }
+  cont.innerHTML = destacadas.length
+    ? `<div class="destacado-grid">${destacadas.map((o, i) => crearTarjetaDestacada(o, i)).join('')}</div>`
+    : '';
+}
+function destacaYaNo(conBotones, o) {
+  return !conBotones.some(x => x === o);
 }
 
 function crearTarjetaDestacada(o, i) {
@@ -380,7 +453,7 @@ function crearTarjetaDestacada(o, i) {
       ${meta ? `<p class="meta">${meta}</p>` : ''}
       ${o.descripcion ? `<p class="entradilla">${e(o.descripcion)}</p>` : ''}
       ${o.sueldo ? `<span class="sueldo">${e(o.sueldo)}</span>` : ''}
-      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonWhatsapp(o)}</div>
+      <div class="botones">${botonBases(o)}${botonVideo(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonFunciones(o)}${botonWhatsapp(o)}</div>
     </article>`;
 }
 
@@ -427,14 +500,14 @@ function crearTarjeta(o) {
   const meta = [o.empresa, o.ubicacion].filter(Boolean).map(e).join(' · ');
   const texto = normalizar(o.titulo + ' ' + o.empresa + ' ' + o.ubicacion + ' ' + o.descripcion);
   return `
-    <article class="tarjeta" data-tipo="${tipoDe(o)}" data-zona="${e(regionDe(o))}" data-origen="${e(o._origen || '')}" data-institucion="${e(normalizar(o.empresa || ''))}" data-texto="${e(texto)}">
+    <article class="tarjeta" data-tipo="${tipoDe(o)}" data-zona="${e(regionDe(o))}" data-origen="${e(o._origen || '')}" data-institucion="${e(normalizar(o.empresa || ''))}" data-sede="${e(normalizar(o.ubicacion || ''))}" data-texto="${e(texto)}">
       <img class="tarjeta-foto" src="${fotoRubro(o)}" alt="${e(o.titulo)}" loading="lazy">
       ${tipos.join('') || etiquetaFecha ? `<div class="categoria">${tipos.join('')}${etiquetaFecha}</div>` : ''}
       <h3 class="titulo">${e(o.titulo)}</h3>
       ${meta ? `<p class="meta">${meta}</p>` : ''}
       ${o.descripcion ? `<p class="descripcion">${e(o.descripcion)}</p>` : ''}
       ${o.sueldo ? `<span class="sueldo">${e(o.sueldo)}</span>` : ''}
-      <div class="botones">${botonFunciones(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonWhatsapp(o)}</div>
+      <div class="botones">${botonBases(o)}${botonVideo(o)}${botonPostular(o)}${botonConvocatoria(o)}${botonFunciones(o)}${botonWhatsapp(o)}</div>
     </article>`;
 }
 
@@ -593,16 +666,33 @@ function botonFunciones(o) {
     : '';
 }
 
-// Enlace directo al sistema de postulación ("[ POSTULAR ]").
+// Enlaces directos de las convocatorias del Estado ("Convocatorias").
+// Mandan los botones directos: POSTULAR (portal de la institución), VER BASES
+// (bases / convocatoria completa y cronograma) y CÓMO POSTULAR (video tutorial).
+// "VER CONVOCATORIA" queda SOLO de respaldo cuando la convocatoria no trae
+// ningún enlace directo (lleva a la ficha en convocatoriasdetrabajo.com).
 function botonPostular(o) {
   return o.postular
     ? `<a class="boton boton-postular" href="${e(o.postular)}" target="_blank" rel="noopener">POSTULAR</a>`
     : '';
 }
 
-// Enlace directo a la convocatoria del Estado (fuente "Convocatorias").
+function botonBases(o) {
+  return (o._origen === 'Convocatorias' && o.ver_detalles)
+    ? `<a class="boton boton-bases" href="${e(o.ver_detalles)}" target="_blank" rel="noopener">VER BASES</a>`
+    : '';
+}
+
+function botonVideo(o) {
+  return (o._origen === 'Convocatorias' && o.guia_registro)
+    ? `<a class="boton boton-video" href="${e(o.guia_registro)}" target="_blank" rel="noopener">CÓMO POSTULAR</a>`
+    : '';
+}
+
 function botonConvocatoria(o) {
-  return (o._origen === 'Convocatorias' && o.enlace)
+  if (o._origen !== 'Convocatorias') return '';
+  if (o.postular || o.ver_detalles || o.guia_registro) return '';
+  return o.enlace
     ? `<a class="boton boton-convocatoria" href="${e(o.enlace)}" target="_blank" rel="noopener">VER CONVOCATORIA</a>`
     : '';
 }
@@ -615,18 +705,77 @@ function botonWhatsapp(o) {
     `<a class="boton boton-whatsapp" href="https://wa.me/51${n}?text=${m}" target="_blank" rel="noopener">WHATSAPP</a>`;
 }
 
-// Chip de fecha: en las FOTOS muestra el día de SUBIDA; en las convocatorias
-// (ONPE y del Estado) muestra la fecha LÍMITE ("Hasta el d mmm"). Al apuntar
-// con el mouse muestra la fecha exacta.
+// Cantidad de botones ACCIONABLES que renderiza cada tarjeta (los que llevan a
+// postular/ver bases/video/llamar). Las DESTACADAS solo muestran ofertas con
+// MÁS DE 2 botones: una tarjeta que solo dice "VER CONVOCATORIA" no sirve como
+// destacada porque no se puede postular a nada (decisión del usuario 2026-09-28).
+function botonesDe(o) {
+  let n = 0;
+  if (o.funciones) n++;
+  if (o.postular) n++;
+  if (o._origen === 'Convocatorias') {
+    if (o.ver_detalles) n++;
+    if (o.guia_registro) n++;
+    if (!(o.postular || o.ver_detalles || o.guia_registro) && o.enlace) n++;
+  }
+  if (o.whatsapp) n += 2; // LLAMAR + WHATSAPP
+  return n;
+}
+
+// "15 sep" (añade el año solo si no es el actual) y "15 de setiembre de 2026".
+function fechaCorta(iso) {
+  const f = new Date(iso + 'T00:00:00');
+  if (isNaN(f)) return '';
+  const opts = { day: 'numeric', month: 'short' };
+  if (f.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return f.toLocaleDateString('es-PE', opts);
+}
+function fechaLarga(iso) {
+  const f = new Date(iso + 'T00:00:00');
+  if (isNaN(f)) return '';
+  return f.toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Chip de fecha:
+//   - FOTOS -> día de SUBIDA (relativo: "Subido hoy", "Subido hace 3 días"...).
+//   - CONVOCATORIAS scrapeadas (ONPE / Estado) -> las DOS fechas: cuándo se
+//     publicó la convocatoria (columna `fecha`, la que trae el scraping) y hasta
+//     cuándo se puede postular (columna `vigencia`). Si la convocatoria no trae
+//     fecha límite ("hasta completar vacantes") se dice explícitamente que no
+//     tiene, en vez de dejar la tarjeta sin fecha. Si además trae cronograma
+//     (columna `inicio`) se muestra el rango de postulación.
+// El tooltip lleva siempre las fechas EXACTAS (con año).
 function fechaChip(o, compacto) {
   if (o._origen === 'Portaltrabajo' || o._origen === 'Convocatorias') {
-    const iso = serieFecha(o.vigencia);
-    if (!iso) return '';
-    const f = new Date(iso + 'T00:00:00');
-    if (isNaN(f)) return '';
-    const exacta = f.toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
-    const corta = f.toLocaleDateString('es-PE', { day: 'numeric', month: 'short' });
-    return `<span class="tipo tipo-fecha" title="Vence el ${e(exacta)}"><span class="pt"></span>Hasta el ${e(corta)}</span>`;
+    const isoVig = serieFecha(o.vigencia);
+    const isoIni = serieFecha(o.inicio);
+    const isoPub = serieFecha(o.fecha);
+    const pub = isoPub ? fechaCorta(isoPub) : '';
+    const vig = isoVig ? fechaCorta(isoVig) : '';
+    const ini = isoIni ? fechaCorta(isoIni) : '';
+    if (!pub && !vig && !ini) return '';
+
+    // Tooltip con todas las fechas exactas que traiga la ficha.
+    const detalle = [];
+    if (pub) detalle.push('Publicado el ' + fechaLarga(isoPub));
+    if (ini) detalle.push('Postulación desde el ' + fechaLarga(isoIni));
+    if (vig) detalle.push('Vence el ' + fechaLarga(isoVig));
+    if (!vig) detalle.push('Sin fecha límite: hasta completar vacantes');
+    const title = detalle.join(' · ');
+
+    let texto;
+    if (ini && vig) {
+      texto = compacto ? `${ini} → ${vig}` : `Del ${ini} al ${vig}`;
+    } else if (vig) {
+      texto = compacto
+        ? (pub ? `pub. ${pub} · hasta ${vig}` : `hasta ${vig}`)
+        : (pub ? `Publicado el ${pub} · Hasta el ${vig}` : `Hasta el ${vig}`);
+    } else {
+      texto = compacto
+        ? (pub ? `pub. ${pub} · sin límite` : 'sin fecha límite')
+        : (pub ? `Publicado el ${pub} · Sin fecha límite` : 'Sin fecha límite');
+    }
+    return `<span class="tipo tipo-fecha" title="${e(title)}"><span class="pt"></span>${e(texto)}</span>`;
   }
   const iso = serieFecha(o.fecha);
   if (!iso) return '';
@@ -695,16 +844,21 @@ function filtrar() {
   const tipo = (document.querySelector('.filtro.activo') || {}).dataset.filtro || 'todo';
   const zona = (document.querySelector('.chip.activa') || { dataset: { zona: '' } }).dataset.zona || '';
   const selInst = document.getElementById('filtroSelInstitucion');
-  const institucion = selInst ? selInst.value : '';
+  const val = selInst ? selInst.value : '';
+  const sep = val.lastIndexOf('|');
+  const institucion = sep === -1 ? val : val.slice(0, sep);      // '' = todas
+  const sede = sep === -1 ? '' : val.slice(sep + 1);             // '' = todas las sedes
+  const sedeOkFn = s => sede === '' || s === sede;
 
   let visibles = 0;
   tarjetas.forEach(t => {
     const d = t.dataset;
     const tipoOk = tipo === 'todo' || (d.tipo || '').indexOf(tipo) !== -1;
     const zonaOk = zona === '' || d.zona === zona;
-    const instOk = institucion === '' || d.institucion === institucion;
+    const instOk = institucion === '' || (institucion === INST_SIN ? (d.institucion === '') : d.institucion === institucion);
+    const sedOK = sedeOkFn(d.sede || '');
     const textoOk = coincide(d.texto || '', busca);
-    const muestra = tipoOk && zonaOk && instOk && textoOk;
+    const muestra = tipoOk && zonaOk && instOk && sedOK && textoOk;
     t.classList.toggle('oculto', !muestra);
     if (muestra) visibles++;
   });

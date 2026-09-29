@@ -50,7 +50,24 @@ usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
     publicándola (re-correr `scraper_onpe.py` cada 2-3 días: lo que el feed deje de
     traer desaparece solo). NO pasan por `DIAS_MAX`.
   - **Chip de la tarjeta ONPE** (2026-09-25): en vez de la fecha de subida muestra
-    "**Hasta el d mmm**" (fecha límite; tooltip "Vence el ..."). Sin `vigencia` -> sin chip.
+    "**Hasta el d mmm**" (fecha límite; tooltip "Vence el ...").
+  - **Chips DE LAS CONVOCATORIAS: las DOS fechas (2026-09-28, pedido del usuario)**:
+    `fechaChip()` en script.js ya NO se queda solo con `vigencia`. Toda convocatoria
+    scrapeada (ONPE `Portaltrabajo` y Estado `Convocatorias`) muestra
+    **"Publicado el d mmm · Hasta el d mmm"** = fecha de publicación (`fecha`, la que
+    trae el scraping) + fecha límite (`vigencia`). Antes solo salía la de fin, y las
+    41 de ONPE "hasta completar vacantes" (sin `vigencia`) NO mostraban ninguna fecha.
+    - Sin `vigencia` -> "**Publicado el d mmm · Sin fecha límite**" (tooltip "... ·
+      Sin fecha límite: hasta completar vacantes"). Con `vigencia` pero sin `fecha`
+      (los 114 PUESTOS por carrera `Universitarios`/`Técnicos`, cuya ficha no trae
+      fecha) -> solo "Hasta el d mmm".
+    - Si algún día existiera la columna `inicio` (cronograma), tiene prioridad y sale
+      el rango "Del d mmm al d mmm" (rama dormida: hoy ningún Excel tiene `inicio`).
+    - En las **destacadas** (compacto) va "pub. 17 set. · hasta 27 set." / "pub. 8 jul. ·
+      sin límite". El tooltip siempre lleva las fechas EXACTAS con año.
+    - Las **FOTOS** no cambian: "Subido hoy / ayer / hace N días / Subido el d mmm".
+    Helpers nuevos: `fechaCorta(iso)` ("15 sep", con año si no es el actual) y
+    `fechaLarga(iso)` ("15 de setiembre de 2026").
   - **PURGA AUTOMÁTICA**: `scraper_onpe.py` llama a `purgar_por_vigencia()` SOLO al
     terminar de guardar `convocatorias.xlsx` (borra filas con vigencia ya pasada; no toca
     `ofertas.xlsx` ni las sin fecha). El usuario YA NO tiene que correr `purgar.py`
@@ -83,8 +100,24 @@ usuario y espero SU decisión. Sin campo completado, esa oferta no se publica
   barra se corre en horizontal.
 - **FILTRO SUPERIOR por institución en TRABAJOS** (2026-09-25): `#filtroOrigen` ya NO es
   por origen (Fotos/Portaltrabajo/Convocatorias, quitado). Es un **select desplegable**
-  con el nombre de las instituciones (columna `empresa`, cada una con su contador).
-  Combina con TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA, los chips de región y el buscador.
+  (`filtroSelInstitucion`, clase `.select-institucion`) con el nombre de las instituciones
+  (columna `empresa`, cada una con su contador). **Desde 2026-09-28 es OPTGROUP POR SEDE**
+  (dado por el usuario: "en caso de las instituciones los juntaste, reparte por sedes pero
+  en el mismo lugar osea que sea desplegable"): cada institución es un grupo
+  (`<optgroup label="PODER JUDICIAL (6)">`) con la opción "Todas las sedes (N)" + UNA
+  opción por SEDE/ubicación con su contador ("Lima (4)", "Arequipa (2)"); las de una sola
+  sede van como opción directa. Las tarjetas sin institución (fotos) entran en el grupo
+  "Sin institución" (marcador interno `INST_SIN`). El valor del `<option>` es
+  `"institución"` (todas las sedes) o `"institución|sede"` (una sede); `filtrar()` combina
+  institución + sede + TODAS/CON ENLACE/CON WHATSAPP/CON LLAMADA + chips de región +
+  buscador. Cada tarjeta lleva `data-institucion` y `data-sede` (ubicación normalizada).
+- **TARJETAS DESTACADAS con >2 botones** (2026-09-28, decisión del usuario): la sección
+  "★ DESTACADA" ya NO son las 3 más recientes, sino las 3 más recientes ENTRE las ofertas
+  con MÁS DE 2 botones accionables (`botonesDe(o)` en script.js: `funciones`/`postular`
+  suman 1, `ver_detalles` y `guia_registro` suman 1 c/u, el respaldo `enlace` suma 1, y
+  `whatsapp` suma 2 por LLAMAR+WHATSAPP). Razón del usuario: "en algunos casos no podemos
+  postular, dice que podemos ver la convocatoria pero no nos sirve de nada si después no
+  podemos postular" → una tarjeta que solo manda a "VER CONVOCATORIA" no se destaca.
 - **Columnas mostradas**: col `duracion` (ej. "8 horas"), `certifica` (si/no) y DOBLE botón:
   EMPEZAR CURSO (`empezar_curso` = plataforma LMS del curso) + VER RUTA (`ver_ruta` =
   ruta formativa). La tarjeta NO lleva LLAMAR/WHATSAPP (los cursos no tienen contacto).
@@ -193,34 +226,68 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   CAS, 728, 276, prácticas, etc. de cualquier institución). Uso:
   - `python3 scraper_convocatoriasdetrabajo.py`        -> TODAS las vigentes de la portada.
   - `--max N` -> limita los detalles a N (solo pruebas).
-- **Detecta SOLO la lista de la PORTADA**: los bloques con "Vigente hasta el DD/MM/AAAA"
-  (`extraer_activas()`); se deduplican y se salta el detalle de las que ya pasaron en el
-  propio listado. La portada publica ~266 vigentes (una tarea periódica de 2-3 días la
-  mantiene sola: lo que deje de estar "Vigente hasta" desaparece). Por defecto NO hay tope
+- **Detecta SOLO las vigentes de la PORTADA** (2026-09-28, el sitio cambió el marcador):
+  cada `article.convocatoria` trae un pill **"Finaliza en N días" / "Finaliza hoy"**
+  (`dias_de_pill()`); de ahí se calcula `vigencia` = hoy + N días. Se guarda además el
+  patrón viejo "Vigente hasta el DD/MM/AAAA" como fallback. Se deduplican y se salta el
+  detalle de las que ya pasaron en el propio listado. La portada publica ~270 vigentes
+  (una tarea periódica de 2-3 días la mantiene sola: lo que deje de estar en la portada
+  desaparece). Por defecto NO hay tope
   (decisión del usuario 2026-09-25: quería ver TODAS las vigentes, no solo 150).
+- **TRABAJOS POR CARRERA** (2026-09-28, pedido del usuario "aparece trabajos por carrera"):
+  además de la portada, scrapea los listados `carreras-profesionales-universitarias.php`
+  (~4 páginas) y `carreras-profesionales-tecnicas.php` (~2 páginas), cada tarjeta es un
+  PUESTO por código CAS/item (slug `oportunidad-laboral-...`). `extraer_activas()` recibe
+  el `slug` esperado en cada página; se marcan con la columna **`categoria`**
+  (`Universitarios`/`Técnicos`; portada = vacía). Las páginas de puesto que ya 404
+  (posición cubierta entre listado y detalle) se descartan solas.
 - OJO: el sitio muestra un total de "3000+" empleos porque cuenta CADA PUESTO por separado
-  (`oportunidad-laboral-...html`, uno por código CAS/item, incluye muchos finalizadas).
-  Las CONVOCATORIAS vigentes son los `oferta-de-empleo-...html` de la portada (~266), que
-  son los que captura este scraper (una tarjeta por convocatoria).
-- **Una tarjeta por convocatoria** (decisión del usuario 2026-09-25), no por puesto: filas
-  con las MISMAS 17 columnas que `convocatorias.xlsx` (`id, titulo, empresa, ubicacion,
-  sueldo, descripcion, enlace, whatsapp, fecha, fuente, destacado, visible, ver_detalles,
-  funciones, guia_registro, postular, vigencia`).
-- Mapeo de campos del detalle: `empresa`=Institución, `ubicacion`="Lugar de labores"
-  (departamentos reales, ej. "Ica, Lima, Tacna"), `sueldo`=Remuneración, `enlace`=URL
-  original, `fecha`=Fecha de Publicación (ISO), `vigencia`="Vigente hasta el DD/MM/AAAA" o
-  "Finaliza: dd de MMMM del AAAA" (ISO). `descripcion` = resumen (contrato, nivel "Hay
-  puestos para", plazas "Hay plazas para", remuneración, puestos destacados como
-  "CAS N° 015 - ITEM N° 01: MADRE SUSTITUTA").
+  (incluye muchísimas finalizadas); solo se capturan los VIGENTES (con pill).
+- **Una tarjeta por convocatoria/puesto**: filas con las 18 columnas (`id, titulo, empresa,
+  ubicacion, sueldo, descripcion, enlace, whatsapp, fecha, fuente, destacado, visible,
+  ver_detalles, funciones, guia_registro, postular, vigencia, categoria`).
+- **El detalle tiene DOS plantillas** (el sitio rediseñó la ficha 2026-09-28):
+  - CONVOCATORIA (`oferta-de-empleo-...`): panel "Datos clave" con `div.dato` /
+    `.dato__label` / `.dato__value` (campos SIN dos puntos) -> `extraer_datos_clave()`.
+    `empresa`=Institución, `sueldo`=Remuneración, `fecha`=`fecha_corta_a_iso()` ("25 sept
+    2026"), `vigencia`="Finaliza: dd de MMMM del AAAA" (ISO).
+  - PUESTO (`oportunidad-laboral-...`): NO tiene ese panel; usa el bloque "Claves del
+    puesto" con el VALOR ENCIMA de la etiqueta -> `extraer_claves_puesto()` ("Ucayali\n
+    Lugar de labores", "S/ 240 / Remuneración", "4 oct 2026 / Plazo para postular").
+    La institución sale del BREADCRUMB ("INSTITUCIÓN > Convocatoria ...") ->
+    `extraer_breadcrumb()`; el `titulo` limpia el prefijo "Convocatoria {INST} ".
+  - `ubicacion`="Lugar de labores" (departamentos reales), `descripcion` = resumen
+    (contrato, "Hay plazas para", "Cantidad de plazas", remuneración, puestos destacados
+    como "CAS N° 015 - ITEM N° 01: MADRE SUSTITUTA").
+- **ENLACES DIRECTOS DE LA FICHA** (2026-09-28, pedido del usuario: NO llevar a
+  convocatoriasdetrabajo.com sino directo al trámite): `extraer_enlaces()` clasifica los
+  links que la propia convocatoria publica y los guarda en las columnas de enlace:
+  `postular` = botón "POSTULA AQUÍ"/"INSCRÍBETE"/"APLICA" (portales de la institución,
+  ej. `aplicativo.pj.gob.pe`, `reclutamiento.onpe.gob.pe`), `ver_detalles` = "Ver aquí
+  Bases (convocatoria completa y cronograma)"/anexos (PDF en Google Drive o repositorio
+  institucional), `guia_registro` = "(VIDEO) Cómo postular" (tutorial YouTube). Se ignoran
+  los links internos del sitio y texto genérico del menú. Muchas convocatorias NO traen
+  ningún enlace directo (solo texto) -> esas columnas quedan vacías.
 - Si `titulo` o `ubicacion` vienen vacíos (páginas compilación sin datos), la fila sale
   `visible=no`. Las que dicen "CONVOCATORIA FINALIZADA" no se publican.
 - **PURGA AUTOMÁTICA**: al terminar llama a `purgar_por_vigencia()` sobre su propio xlsx
   (borra las con vigencia ya pasada). `purgar.py` también lo incluye en `purgar_todo()`.
 - Genera respaldo `convocatoriasdetrabajo.json`.
-- En la página: etiqueta **"Convocatorias"** con su botón en el filtro superior
-  (`renderFiltroOrigen`, color #0284c7), **botón VER CONVOCATORIA** (`botonConvocatoria()`,
-  clase `.boton-convocatoria`), chip "Hasta el d mmm" y CON ENLACE cuenta con
-  `esEnlazada()` (enlace de esta fuente ya cuenta como botón web).
+- En la página (2026-09-28): botones DIRECTOS por tarjeta de "Convocatorias":
+  **POSTULAR** (`botonPostular()` -> `postular`), **VER BASES** (`botonBases()` ->
+  `ver_detalles`, clase `.boton-bases` #4f46e5) y **CÓMO POSTULAR** (`botonVideo()` ->
+  `guia_registro` video, clase `.boton-video` #dc2626). **VER CONVOCATORIA**
+  (`botonConvocatoria()`) SOLO queda de respaldo cuando la convocatoria no trae ningún
+  enlace directo (lleva a la ficha original). Etiqueta **"Convocatorias"** (color
+  #0284c7), chip "Hasta el d mmm" y CON ENLACE cuenta con `esEnlazada()` (enlace de esta
+  fuente ya cuenta como botón web).
+- **SOLO SE PUBLICAN LAS QUE SE PUEDEN POSTULAR** (decisión del usuario 2026-09-28:
+  "de qué me sirve que los vean si no pueden postular"): `puedePostular()` en script.js
+  oculta de la página las convocatorias del Estado que NO traen ningún enlace directo
+  (solo el respaldo VER CONVOCATORIA, columna `postular`/`ver_detalles`/`guia_registro`
+  vacías). Era ~196 de 372 → quedan ~176 visibles. Fotos (se contacta por
+  llamada/whatsapp) y ONPE (su `postular` siempre lleno) no se tocan. El Excel se
+  conserva íntegro y se regenera igual; solo es un filtro de visibilidad de la página.
 - En `fotoRubro()` las Convocatorias NO pasan por la rama `onpe`: caen en el mapeo por
   palabras clave de `FOTOS_RUBROS` (foto del rubro del puesto, ej. "médicos"->salud,
   "conductores"->chofer, "prácticas de oficina"->oficina).
@@ -443,12 +510,15 @@ borró 104 de la corrida anterior. El resto del feed queda en `convocatorias_onp
 (respaldo) y vuelve al Excel solo al re-correr `scraper_onpe.py` (allí se vuelve a purgar
 con la regla de vigencia).
 
-SCRAPING en `convocatoriasdetrabajo.xlsx` (2026-09-25): **262 convocatorias del Estado**
-(SIN tope: se procesaron las 267 vigentes de la portada y la purga eliminó 5 que al leer
-el detalle ya habían pasado — quedan 262), todas visibles y con `vigencia` >= hoy. La
-portada del sitio publica ~266 vigentes "Vigente hasta el DD/MM/AAAA"; al re-correr el
-scraper cada 2-3 días las que vencen desaparecen solas. El total "3000+" del sitio
-cuenta por PUESTO (muchos finalizados) y no se usan para no saturar la página.
+SCRAPING en `convocatoriasdetrabajo.xlsx` (2026-09-28): **372 filas** (258 convocatorias de
+la portada + 111 puestos Universitarios + 3 Técnicos), todas visibles y con `vigencia` >= hoy.
+La portada publica ~270 vigentes con pill "Finaliza en N días"; al re-correr el scraper cada
+2-3 días las que vencen desaparecen solas, y los puestos por carrera ya cubiertos (página
+404 en el detalle) se descartan solos. Cobertura de enlaces directos: 133 con POSTULAR,
+167 con VER BASES, 1 con CÓMO POSTULAR (video); el resto queda con el respaldo VER
+CONVOCATORIA. El total "3000+" del sitio cuenta por PUESTO sin filtrar (incluye
+finalizadas) y no se usa. LA PÁGINA muestra ~176 de esas 372 (solo las postulables,
+ver `puedePostular()`); el Excel conserva las 372.
 
 ## Snapshot CURSOS 2026-09-17 (cambios de este día)
 `scraper_capacita.py` ahora incluye la columna **`segmento`** = entidad que EMITE cada
