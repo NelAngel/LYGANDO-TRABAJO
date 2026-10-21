@@ -17,19 +17,14 @@ const FUENTES = [
 ];
 
 Promise.all(FUENTES.map(f =>
-  fetch(f.archivo, { cache: 'no-store' })
-    .then(res => (res.ok ? res.arrayBuffer() : null))
-    .then(buf => {
-      if (!buf) return [];
-      const libro = XLSX.read(buf, { type: 'array' });
-      const hoja = libro.Sheets[libro.SheetNames[0]];
-      return (XLSX.utils.sheet_to_json(hoja, { defval: '' }))
+  cargarFuente(f)
+    .then(filas =>
+      filas
         .filter(esOfertaVisible)
         .map(o => Object.assign(o, { _origen: f._origen })) // _origen ANTES del filtro: esReciente lo usa
         .filter(puedePostular)                                // solo convocatorias a las que SÍ se postula
-        .filter(o => esCurso(o) || esReciente(o));          // solo las ofertas/convocatorias caducan
-    })
-    .catch(() => [])
+        .filter(o => esCurso(o) || esReciente(o))            // solo las ofertas/convocatorias caducan
+    )
 ))
   .then(arrays => {
     const todos = [].concat(...arrays);
@@ -50,6 +45,26 @@ Promise.all(FUENTES.map(f =>
 function esOfertaVisible(o) {
   if (!o.titulo) return false;
   return !['no', '0', 'false', 'NO'].includes(String(o.visible || '').trim().toLowerCase());
+}
+
+// Carga una fuente de dos maneras:
+//  1) el Excel con fetch (así la web publicada toma siempre el dato más fresco);
+//  2) el respaldo embebido en `datos.js` (generado por generar_datos_js.py).
+// El paso 2 es el que permite abrir index.html con DOBLE CLIC (file://): ahí el
+// navegador bloquea la lectura de archivos locales por fetch, y sin el
+// respaldo la página se quedaría vacía. En file:// se usa el respaldo directo.
+function cargarFuente(f) {
+  const respaldo = (window.LYGANDO_DATOS && window.LYGANDO_DATOS[f.archivo]) || [];
+  if (location.protocol === 'file:') return Promise.resolve(respaldo);
+  return fetch(f.archivo, { cache: 'no-store' })
+    .then(res => (res.ok ? res.arrayBuffer() : null))
+    .then(buf => {
+      if (!buf) throw new Error('no se pudo leer ' + f.archivo);
+      const libro = XLSX.read(buf, { type: 'array' });
+      const hoja = libro.Sheets[libro.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(hoja, { defval: '' });
+    })
+    .catch(() => respaldo);
 }
 
 // "De qué me sirve que los vean si no pueden postular" (decisión del usuario

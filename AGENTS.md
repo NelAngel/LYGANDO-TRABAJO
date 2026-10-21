@@ -471,7 +471,67 @@ botones existen y el scraper no los reconoció).
   ("Otro") cae en la genérica `trabajo.jpg`. Se inyecta como PRIMER hijo del `<article>`
   en `crearTarjetaCurso()` (misma `.tarjeta-foto`, mismo CSS, sin cambios de style).
 
-## Estado actual (snapshot 2026-09-28 — 50 imágenes nuevas procesadas)
+## PÁGINA EN `file://` — respaldo `datos.js` (decisión del usuario 2026-10-21)
+- El usuario abre la página con **doble clic**: `file:///var/www/html/Pagina_trabajo/index.html`
+  y espera ver las ofertas AHÍ (como prueba). Con `file://` el navegador **BLOQUEA**
+  leer los `.xlsx` con `fetch` (no se puede pedir un archivo local por AJAX), así que
+  antes la página se quedaba vacía.
+- **Solución implementada**: `generar_datos_js.py` vuelca los 4 Excels a `datos.js`
+  (`window.LYGANDO_DATOS = {"ofertas.xlsx":[...], "convocatorias.xlsx":[...], ...}`),
+  `index.html` lo carga antes de `script.js` y `script.js` usa el respaldo cuando el
+  `fetch` falla o cuando `location.protocol === 'file:'` (función `cargarFuente(f)`).
+  En la web publicada (http) se sigue leyendo el **Excel** (dato fresco); el respaldo
+  solo entra si el Excel no se puede leer.
+- **REGLA: después de registrar ofertas, re-scrapear o purgar, SIEMPRE correr
+  `python3 generar_datos_js.py`** (regenera `datos.js`). Si no, el `file://` muestra
+  datos viejos. El archivo NO se edita a mano.
+- Verificación usada: `/tmp/opencode/lyg/simular_pagina.js` (modo http, lee los Excel)
+  y `/tmp/opencode/lyg/simular_file.js` (modo file://, usa `datos.js`) — corren el
+  `script.js` REAL con un DOM simulado e imprimen cuántas tarjetas se pintan.
+
+## PUBLICAR = `git push` (2026-10-21)
+- La web pública es **GitHub Pages** con el dominio `lygane.lat` (el `CNAME` del repo
+  dice "lygame.latt", que está MAL escrito: la redirección real es `lygane.lat`).
+  OJO: `lygame.latt` no resuelve DNS; el dominio bueno es `lygane.lat`.
+- Como el sitio se arma desde el repo, **guardar el Excel NO basta**: hay que
+  `git add -A && git commit && git push` para que las ofertas aparezcan en la web.
+  (El 2026-10-21 el usuario avisó "no me aparecen los trabajos" porque solo había
+  commit local, sin push.)
+- En el repo está Apache con `DocumentRoot /var/www/html` → la copia local se sirve en
+  `http://127.0.0.1/Pagina_trabajo/` (si `apache2ctl start` está corriendo). El
+  Live Server de VS Code es otra opción; lo importante es NO abrir el HTML con doble
+  clic y esperar que el `fetch` funcione (ya tiene el respaldo `datos.js`).
+
+## Estado actual (snapshot 2026-10-21 — 101 imágenes nuevas + scraping de las 3 fuentes)
+**101 imágenes nuevas del 21/10 en `images/` (`IMG-20261021-WA00xx.jpg`). Resultado:
+52 ofertas NUEVAS registradas (ids 104-155) + 1 recuperada (WA0066), todas con
+`fecha`=2026-10-21, `visible=si`, `fuente=Foto`, `destacado=no`.**
+
+- **8 DUPLICADOS EXACTOS ignorados** (mismo puesto+lugar+número): WA0005=id48,
+  WA0016=id37, WA0021=id102, WA0027=id23, WA0075=id8, WA0077=id61, WA0083=id46,
+  WA0085=id63.
+- **41 NO SON TRABAJOS ignorados**: venta/alquiler de lotes, casas, locales,
+  minidepartamentos y habitaciones; traspasos; venta de parihuelas, fotocopiadoras,
+  moto y vehículo; servicios (maestro de ceremonias, construcción/albañilería, clínica,
+  rituales); alquiler de compactador y herramientas.
+- **WA0066** resultó ser un aviso de trabajo (obra de cimentación para torres de alta
+  tensión, QORITICLLA S.A.C, Chocñihuaqui - Cayarani - Condesuyos - **Arequipa**,
+  WhatsApp **997601198**, 10 operarios + 10 oficiales + peones + operadores de
+  retroexcavadora, régimen 20x10, correo qoriticlla.gerencia@gmail.com) → id 155.
+  Es la MISMA obra que el id 11 (purgado por caducidad) pero con OTRO número.
+- Dudas de lectura avisadas al usuario: WA0084 ("Machupicchu" vs "Mágica"), WA0087
+  (título deducido de los requisitos), WA0025 (también "Comercial"), WA0093 (puesto
+  genérico), WA0102 (empresa ilegible).
+- Números compartidos avisados: 978664185 (ids 108/129), 959867892 (ids 128/130/132),
+  972930114, 910188719, 932558281, 957061565.
+- **Scraping del 21/10**: `scraper_onpe.py` → `convocatorias.xlsx` con **41** filas
+  (purgadas 109 con vigencia pasada); `scraper_convocatoriasdetrabajo.py` →
+  `convocatoriasdetrabajo.xlsx` con **299** filas (0 purgadas); `scraper_capacita.py
+  --todo` → `cursos.xlsx` con **214** cursos.
+- **Página con los datos nuevos: 183 tarjetas** (52 fotos + 41 ONPE + 90 del Estado
+  postulables) en **12 regiones**, + 214 cursos. Verificado con los dos simuladores.
+
+## Estado anterior (snapshot 2026-09-28 — 50 imágenes nuevas procesadas)
 **50 imágenes nuevas del 28/09 en `images/` (`IMG-20260928-WA00xx.jpg`). Resultado:
 30 ofertas NUEVAS registradas (ids 74-103) + 2 actualizaciones (ids 12 y 31), todo con
 `fecha`=2026-09-28.**
@@ -718,7 +778,10 @@ Huawei 14, ABC del BCP 1 (todos visibles, ninguno sin segmento). En la página:
    vigentes se quedan solas conforme caducan. No hace falta correr purga manual.
 3. PURGAR fotos: `python3 purgar.py` (borra de `ofertas.xlsx` los anuncios con >10 días y
    de los dos Excels de convocatorias las de vigencia pasada — cada archivo con su regla).
-4. Verificar con Node (mismo flujo SheetJS) y el usuario refresca Live Server.
+4. Regenerar el respaldo `datos.js` (obligatorio para que la página funcione
+   abriendo el HTML con doble clic): `python3 generar_datos_js.py`.
+5. Verificar con Node (mismo flujo SheetJS) y el usuario refresca Live Server.
+6. PUBLICAR: `git add -A && git commit && git push` (la web es GitHub Pages).
 
 ## ANTI-DUPLICADOS (imágenes y datos repetidos) — decidido por el usuario 2026-09-17
 - Al extraer la información de las fotos puede pasarnos que haya **imágenes repetidas**
@@ -759,7 +822,8 @@ Huawei 14, ABC del BCP 1 (todos visibles, ninguno sin segmento). En la página:
   registrar; si coincide en parte pero cambió algo -> avisar al usuario con `--ver`.
 
 ## Archivos de la carpeta
-`index.html`, `script.js`, `ofertas.xlsx`, `convocatorias.xlsx`, `convocatorias_onpe.json`,
+`index.html`, `script.js`, `datos.js` (respaldo embebido, se genera con
+`generar_datos_js.py`), `ofertas.xlsx`, `convocatorias.xlsx`, `convocatorias_onpe.json`,
 `convocatoriasdetrabajo.xlsx`, `convocatoriasdetrabajo.json`, `cursos.xlsx`, `cursos.json`,
 `xlsx.full.min.js`, `scraper_onpe.py`, `scraper_convocatoriasdetrabajo.py`,
 `scraper_capacita.py`, `purgar.py`, `verificar_duplicados.py`, la carpeta **`images/`**
