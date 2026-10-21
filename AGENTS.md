@@ -2,7 +2,9 @@
 
 ## Qué es esto
 Página web pública de ofertas de empleo del Perú: `index.html` (HTML puro, CSS integrado),
-leída en el navegador con **Live Server de Visual Studio Code**. NADA de PHP, MySQL ni phpMyAdmin.
+leída en el navegador con **Live Server de Visual Studio Code** (o con doble clic en
+`index.html`, gracias al respaldo `datos.js`; ver la sección "PÁGINA EN `file://`").
+NADA de PHP, MySQL ni phpMyAdmin.
 Base de datos = DOS+Tres Excels leídos con SheetJS (`xlsx.full.min.js` local):
 
 - **`ofertas.xlsx`**                     -> anuncios de FOTOS (manual, con OCR).
@@ -327,15 +329,18 @@ de la mina TINTO Ccapmarca): el psm 6/3 daba "TINTO", pero el **sello** del cart
   palabras clave de `FOTOS_RUBROS` (foto del rubro del puesto, ej. "médicos"->salud,
   "conductores"->chofer, "prácticas de oficina"->oficina).
 
-## COBERTURA DE LA PÁGINA — qué se publica y qué NO (2026-09-28, revisado tras el lote)
-Controles verificados con Node/SheetJS el 2026-09-28 por la noche (**296 tarjetas**):
+## COBERTURA DE LA PÁGINA — qué se publica y qué NO (actualizado 2026-10-21)
+Controles verificados con `herramientas/verificar.js` y `herramientas/simular_pagina.js`
+el 2026-10-21 (**183 ofertas + 214 cursos**):
 
 | Fuente | En el Excel | En la página | Por qué la diferencia |
 |---|---|---|---|
-| Fotos (`ofertas.xlsx`) | 103 filas / 101 `visible=si` | **95** | 6 caducaron (más de 10 días SIN WhatsApp o más de 14 CON WhatsApp) |
-| ONPE (`convocatorias.xlsx`) | 46 | 36 | 5 ya con `vigencia` pasada + 5 `visible=no` |
-| Estado (`convocatoriasdetrabajo.xlsx`) | 372 | **165** | 207 sin enlace directo (regla `puedePostular()`) |
+| Fotos (`ofertas.xlsx`) | 155 filas | **52** | las de setiembre ya vencieron (10/14 días) y la purga las borró; solo quedan las 52 del 21/10 |
+| ONPE (`convocatorias.xlsx`) | 41 | 35 | las que ya pasaron su `vigencia` + las `visible=no` |
+| Estado (`convocatoriasdetrabajo.xlsx`) | 299 | **90** | las que NO traen enlace directo (regla `puedePostular()`) |
 | Cursos (`cursos.xlsx`) | 214 | 214 | no caducan |
+
+El histórico del 28/09 (para comparar): 296 tarjetas = 95 fotos + 36 ONPE + 165 Estado.
 
 OJO: al subir las 14 días solo para las que tienen WhatsApp, casi todas las fotos sobrevivieron
 y la página pasó de 46 a 95 tarjetas de fotos. Antes (con 10 días planos) eran 46.
@@ -380,10 +385,14 @@ botones existen y el scraper no los reconoció).
 
 ## DISEÑO / GIT (2026-09-18)
 - **GIT conectado**: repo GitHub `NelAngel/LYGANDO-TRABAJO` (remote `origin`),
-  rama `main`. Se subió con `.gitignore` que ignora `__pycache__/`, `*.pyc` y
-  `.~lock.*#` (bloqueos de LibreOffice); esos archivos ya se quitaron del tracking
-  (`git rm --cached`). Al cambiar algo importante, recordar: `git add -A && git commit`
-  y `git push` (SOLO si el usuario lo pide).
+  rama `main`. Se subió con `.gitignore` que ignora `__pycache__/`, `*.pyc`,
+  `.~lock.*#` (bloqueos de LibreOffice) y `herramientas/_ocr_tmp/` +
+  `herramientas/ocr_lote.json` (OCR en lote: son archivos de trabajo); esos archivos
+  ya se quitaron del tracking (`git rm --cached`). Al cambiar algo importante:
+  `git add -A && git commit` y **`git push`** (publicar = push, ver la sección
+  "PUBLICAR = git push"; si el usuario pide solo el commit, se omite el push).
+  OJO: el push del 21/10 tardó varios minutos (suben ~30 MB de fotos nuevas);
+  si se corta, relanzarlo: `git push origin main`.
 - **La página entra SIEMPRE por arriba** (decisión del usuario 2026-09-18): al cargar,
   `script.js` fuerza scroll al inicio (`scrollRestoration='manual'` + `scrollTo(0,0)` al
   inicio y al final, y `history.replaceState` limpia el ancla). Sirve para el caso "lo
@@ -502,10 +511,29 @@ botones existen y el scraper no los reconoció).
   Live Server de VS Code es otra opción; lo importante es NO abrir el HTML con doble
   clic y esperar que el `fetch` funcione (ya tiene el respaldo `datos.js`).
 
+## HERRAMIENTAS DE VERIFICACIÓN (carpeta `herramientas/`) — 2026-10-21
+Todo lo que se usó para registrar/verificar el lote del 21/10 quedó guardado en el
+repo (antes vivía en `/tmp`, que se borra al reiniciar):
+
+- `herramientas/ocr_lote.py` — **OCR en lote** de las imágenes nuevas de `images/`:
+  amplía la imagen (los carteles de la agencia son chiquitos), la parte en 2
+  recuadros, aplica umbral (135) para tapar el fondo de colores y corre
+  tesseract en psm 6 y 11. Salida: `herramientas/ocr_lote.json` (ignorado por git).
+  Uso: `python3 herramientas/ocr_lote.py IMG-20261021` (o el nombre de una sola).
+- `herramientas/verificar.js` — comprueba la hoja `Ofertas` con la MISMA lógica de la
+  página: vigencia (10/14 días), regiones, dedupe (`claveOferta`) y campos
+  obligatorios (REGLA DE ORO). Imprime: publicables, duplicados ocultos, sin región,
+  por región, whatsapp/llamada, incompletos y números repetidos.
+- `herramientas/simular_pagina.js` — corre el `script.js` REAL con un DOM simulado y
+  los Excel locales: dice cuántas tarjetas se pintan (modo http).
+- `herramientas/simular_file.js` — lo mismo pero en modo `file://` (fetch bloqueado,
+  usa el respaldo `datos.js`): comprueba que la página funciona con doble clic.
+- `generar_datos_js.py` (raíz) — regenera `datos.js` (respaldo para `file://`).
+
 ## Estado actual (snapshot 2026-10-21 — 101 imágenes nuevas + scraping de las 3 fuentes)
 **101 imágenes nuevas del 21/10 en `images/` (`IMG-20261021-WA00xx.jpg`). Resultado:
-52 ofertas NUEVAS registradas (ids 104-155) + 1 recuperada (WA0066), todas con
-`fecha`=2026-10-21, `visible=si`, `fuente=Foto`, `destacado=no`.**
+52 ofertas NUEVAS registradas (ids 104-155; la ÚLTIMA, id 155, es WA0066), todas
+con `fecha`=2026-10-21, `visible=si`, `fuente=Foto`, `destacado=no`.**
 
 - **8 DUPLICADOS EXACTOS ignorados** (mismo puesto+lugar+número): WA0005=id48,
   WA0016=id37, WA0021=id102, WA0027=id23, WA0075=id8, WA0077=id61, WA0083=id46,
@@ -780,7 +808,8 @@ Huawei 14, ABC del BCP 1 (todos visibles, ninguno sin segmento). En la página:
    de los dos Excels de convocatorias las de vigencia pasada — cada archivo con su regla).
 4. Regenerar el respaldo `datos.js` (obligatorio para que la página funcione
    abriendo el HTML con doble clic): `python3 generar_datos_js.py`.
-5. Verificar con Node (mismo flujo SheetJS) y el usuario refresca Live Server.
+5. Verificar con las herramientas de `herramientas/` (`node herramientas/verificar.js`
+   y `node herramientas/simular_pagina.js`) y el usuario refresca la página.
 6. PUBLICAR: `git add -A && git commit && git push` (la web es GitHub Pages).
 
 ## ANTI-DUPLICADOS (imágenes y datos repetidos) — decidido por el usuario 2026-09-17
@@ -826,6 +855,8 @@ Huawei 14, ABC del BCP 1 (todos visibles, ninguno sin segmento). En la página:
 `generar_datos_js.py`), `ofertas.xlsx`, `convocatorias.xlsx`, `convocatorias_onpe.json`,
 `convocatoriasdetrabajo.xlsx`, `convocatoriasdetrabajo.json`, `cursos.xlsx`, `cursos.json`,
 `xlsx.full.min.js`, `scraper_onpe.py`, `scraper_convocatoriasdetrabajo.py`,
+`generar_datos_js.py`, la carpeta **`herramientas/`** (ocr_lote.py, verificar.js,
+simular_pagina.js, simular_file.js),
 `scraper_capacita.py`, `purgar.py`, `verificar_duplicados.py`, la carpeta **`images/`**
 con los JPEG de los anuncios (ya procesadas por OCR) y la carpeta **`fotos/`** con las 84
 imágenes ilustrativas (60 de rubro de trabajos + 20 de institución de cursos + 4 de votación

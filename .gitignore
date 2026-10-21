@@ -1,3 +1,4 @@
 __pycache__/
 *.pyc
-.~lock.*#
+.~lock.*#herramientas/_ocr_tmp/
+herramientas/ocr_lote.json
